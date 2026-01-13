@@ -238,14 +238,12 @@ Possible future improvements:
 
 ## Contributors
 
-- Initial implementation: Claude Code (AI Assistant)
+- Initial implementation: Nigel Randsley
 - Project owner: Nigel Randsley
 
 ## Acknowledgments
 
 - Data provided by [INE Portugal](https://www.ine.pt)
-- Inspired by the [ineptR](https://c-matos.github.io/ineptR/) R package
-- Built with guidance from the user's requirements
 
 ## License
 
