@@ -41,30 +41,30 @@ for indicator in results:
     print(f"{indicator.varcd}: {indicator.title}")
 
 # Get data as DataFrame
-df = ine.get_data("0004167")
+df = ine.get_data("0004127")
 print(df.head())
 
 # Get data with dimension filters
 df = ine.get_data(
-    "0004167",
+    "0004127",
     dimensions={"Dim1": "2023", "Dim2": "1"}  # Year 2023, Portugal
 )
 
 # Export to CSV
-ine.export_csv("0004167", "population.csv")
+ine.export_csv("0004127", "population.csv")
 ```
 
 ## Command Line Usage
 
 ```bash
 # Search for indicators
-pyine search "gdp"
+pyine search "pib"
 
 # Download data
-pyine download 0004167 --output data.csv
+pyine download 0004127 --output data.csv
 
 # Get indicator information
-pyine info 0004167
+pyine info 0004127
 
 # List available themes
 pyine list-commands themes
@@ -110,7 +110,7 @@ results = ine.filter_by_theme(theme="Labour Market")
 
 ```python
 # Get all data for an indicator
-df = ine.get_data("0004167")
+df = ine.get_data("0004127")
 
 # Get data with filters
 df = ine.get_data(
@@ -122,10 +122,10 @@ df = ine.get_data(
 )
 
 # Get data as JSON
-json_data = ine.get_data("0004167", output_format="json")
+json_data = ine.get_data("0004127", output_format="json")
 
 # Get data as dictionary
-dict_data = ine.get_data("0004167", output_format="dict")
+dict_data = ine.get_data("0004127", output_format="dict")
 ```
 
 #### Get Metadata
@@ -137,7 +137,7 @@ print(metadata.indicator_name)
 print(metadata.unit)
 
 # Get available dimensions
-dimensions = ine.get_dimensions("0004167")
+dimensions = ine.get_dimensions("0004127")
 for dim in dimensions:
     print(f"Dimension {dim.id}: {dim.name}")
     for value in dim.values:
@@ -148,18 +148,18 @@ for dim in dimensions:
 
 ```python
 # Export to CSV
-ine.export_csv("0004167", "output.csv")
+ine.export_csv("0004127", "output.csv")
 
 # Export with metadata header
 ine.export_csv(
-    "0004167",
+    "0004127",
     "output.csv",
     include_metadata=True
 )
 
 # Export with dimension filters
 ine.export_csv(
-    "0004167",
+    "0004127",
     "output.csv",
     dimensions={"Dim1": "2023"}
 )
@@ -177,7 +177,7 @@ pyine search "population"
 pyine search "population" --theme "Population"
 
 # Limit results
-pyine search "gdp" --limit 5
+pyine search "pib" --limit 5
 
 # Portuguese language
 pyine search "população" --lang PT
@@ -187,23 +187,23 @@ pyine search "população" --lang PT
 
 ```bash
 # Download to CSV (default)
-pyine download 0004167 --output data.csv
+pyine download 0004127 --output data.csv
 
 # Download as JSON
-pyine download 0004167 --output data.json --output-format json
+pyine download 0004127 --output data.json --output-format json
 
 # Download with dimension filters
-pyine download 0004167 --output data.csv -d Dim1=2023 -d Dim2=1
+pyine download 0004127 --output data.csv -d Dim1=2023 -d Dim2=1
 ```
 
 #### Info Command
 
 ```bash
 # Get indicator information
-pyine info 0004167
+pyine info 0004127
 
 # Portuguese language
-pyine info 0004167 --lang PT
+pyine info 0004127 --lang PT
 ```
 
 #### List Command
@@ -220,7 +220,7 @@ pyine list-commands indicators --theme "Population"
 
 ```bash
 # Get available dimensions for an indicator
-pyine dimensions 0004167
+pyine dimensions 0004127
 ```
 
 #### Cache Commands
