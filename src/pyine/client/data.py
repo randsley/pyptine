@@ -88,41 +88,41 @@ class DataClient(INEClient):
             logger.error(f"Failed to get data for {varcd}: {str(e)}")
             raise
 
-    def get_data_paginated(
+    def get_all_data(
         self,
         varcd: str,
         dimensions: Optional[Dict[str, str]] = None,
         chunk_size: int = DEFAULT_PAGE_SIZE,
     ) -> Iterator[DataResponse]:
-        """Fetch large datasets in chunks (paginated).
+        """Fetch all data for a given indicator.
 
-        This is useful for indicators with more than 40,000 data points.
-        Note: The API itself may not support true pagination, so this
-        method currently returns all data in one chunk. Future versions
-        may implement proper pagination if the API supports it.
+        Note: The INE API does not support true pagination. This method
+        fetches all available data for the specified indicator and dimensions
+        in a single request (up to the API's internal limit of 40,000 data points).
+        For larger datasets, consider breaking down requests by dimensions manually.
 
         Args:
             varcd: Indicator code
             dimensions: Optional dimension filters
-            chunk_size: Maximum data points per chunk (default: 40000)
+            chunk_size: This parameter is ignored as true pagination is not supported.
 
         Yields:
-            DataResponse objects, one per chunk
+            DataResponse objects, one per chunk (currently always one chunk)
 
         Example:
             >>> client = DataClient()
-            >>> for chunk in client.get_data_paginated("0004167"):
+            >>> for chunk in client.get_all_data("0004167"):
             ...     df = chunk.to_dataframe()
             ...     # Process chunk
         """
-        logger.info(f"Fetching paginated data for indicator {varcd}")
+        logger.info(f"Fetching all data for indicator {varcd}")
 
         # For now, fetch all data at once
-        # TODO: Implement true pagination if API supports it
+        # TODO: Implement true pagination if API supports it (by dimensions)
         response = self.get_data(varcd, dimensions)
         yield response
 
-        logger.info(f"Completed paginated fetch for {varcd}")
+        logger.info(f"Completed fetch for {varcd}")
 
     def _build_params(
         self, varcd: str, dimensions: Optional[Dict[str, str]] = None

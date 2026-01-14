@@ -88,7 +88,7 @@ class TestDataClient:
             status=200,
         )
 
-        chunks = list(data_client.get_data_paginated("0004167"))
+        chunks = list(data_client.get_all_data("0004167"))
 
         assert len(chunks) >= 1
         assert all(isinstance(chunk, DataResponse) for chunk in chunks)
