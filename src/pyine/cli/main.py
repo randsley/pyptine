@@ -435,17 +435,17 @@ def cache_info() -> None:
     if "metadata_cache" in info:
         meta_info = info["metadata_cache"]
         click.echo(f"{click.style('Metadata Cache:', fg='cyan')}")
-        click.echo(f"  Size: {meta_info.get('size', 0)} entries")
+        click.echo(f"  - Entries: {meta_info.get('size', 0)}")
         if "path" in meta_info:
-            click.echo(f"  Location: {meta_info['path']}")
+            click.echo(f"  - Location: {meta_info['path']}")
 
     # Data cache
     if "data_cache" in info:
         data_info = info["data_cache"]
         click.echo(f"\n{click.style('Data Cache:', fg='cyan')}")
-        click.echo(f"  Size: {data_info.get('size', 0)} entries")
+        click.echo(f"  - Entries: {data_info.get('size', 0)}")
         if "path" in data_info:
-            click.echo(f"  Location: {data_info['path']}")
+            click.echo(f"  - Location: {data_info['path']}")
 
     click.echo()
 
