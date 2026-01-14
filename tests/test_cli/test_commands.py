@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Union
 
 import responses
 from click.testing import CliRunner

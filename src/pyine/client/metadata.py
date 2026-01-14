@@ -1,7 +1,7 @@
 """Metadata client for INE Portugal API."""
 
 import logging
-from typing import Any, Dict, List, cast
+from typing import Any, Dict, List, Union, cast
 
 from pyine.client.base import INEClient
 from pyine.models.indicator import (

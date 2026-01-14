@@ -4,6 +4,7 @@ import pytest
 import responses
 
 from unittest.mock import MagicMock
+from typing import Union
 
 from pyine.client.data import DataClient
 from pyine.client.metadata import MetadataClient

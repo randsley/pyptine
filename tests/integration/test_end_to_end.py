@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 import responses
 from pathlib import Path
+from typing import Union
 
 from pyine import INE
 

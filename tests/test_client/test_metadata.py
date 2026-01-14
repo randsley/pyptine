@@ -2,6 +2,7 @@
 
 import pytest
 import responses
+from typing import Union
 
 from pyine.client.metadata import MetadataClient
 from pyine.models.indicator import Dimension, DimensionValue, IndicatorMetadata
