@@ -12,21 +12,15 @@ pyine has been **tested and verified** on the following Python versions:
 - **Coverage**: 73%
 - **Status**: **FULLY COMPATIBLE**
 
-### Python 3.8.10 ✅
 
-- **Platform**: macOS (darwin)
-- **Test Date**: 2026-01-14
-- **Tests**: All tests passed after compatibility fixes.
-- **Coverage**: 73%
-- **Status**: **FULLY COMPATIBLE**
 
 ## 📋 Declared Compatibility Range
 
-pyine declares support for **Python 3.8 - 3.14**:
+pyine declares support for **Python 3.9 - 3.14**:
 
 | Version | Status | Notes |
 |---------|--------|-------|
-| Python 3.8 | ✅ **Tested** | Verified working after fixes |
+
 | Python 3.9 | ✅ Declared | |
 | Python 3.10 | ✅ Declared | |
 | Python 3.11 | ✅ Declared | |
@@ -39,14 +33,14 @@ pyine declares support for **Python 3.8 - 3.14**:
 GitHub Actions will test against all declared versions:
 
 ```yaml
-python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
 os: [ubuntu-latest, macos-latest, windows-latest]
 ```
 
 This ensures compatibility across:
-- **7 Python versions**
+- **6 Python versions**
 - **3 operating systems**
-- **21 total test combinations**
+- **18 total test combinations**
 
 
 
@@ -66,10 +60,10 @@ All dependencies work with Python 3.8-3.14:
 
 ## 🚀 Installation
 
-pyine can be installed on Python 3.8-3.14:
+pyine can be installed on Python 3.9-3.14:
 
 ```bash
-# Requires Python 3.8 or higher
+# Requires Python 3.9 or higher
 pip install pyine
 ```
 
@@ -93,7 +87,7 @@ pip install pyine
 
 ## ✨ Conclusion
 
-pyine is **production-ready** for Python 3.8 through 3.14.
+pyine is **production-ready** for Python 3.9 through 3.14.
 
 ---
 
