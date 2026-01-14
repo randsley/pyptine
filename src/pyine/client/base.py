@@ -172,6 +172,8 @@ class INEClient:
         # Add language to params
         if params is None:
             params = {}
+        else:
+            params = params.copy()
         params["lang"] = self.language
 
         logger.debug(f"Making request to {endpoint} with params: {params}")
