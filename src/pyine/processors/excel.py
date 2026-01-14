@@ -84,11 +84,11 @@ def format_for_excel(
     df = df.copy()
 
     # Format datetime columns
-    for col in df.select_dtypes(include=["datetime64"]).columns:
+    for col in df.select_dtypes(include=["datetime64"]).columns:  # type: str
         df[col] = df[col].dt.strftime(date_format)
 
     # Format float columns
-    for float_col in df.select_dtypes(include=["float64"]).columns:
+    for float_col in df.select_dtypes(include=["float64"]).columns:  # type: str
         df[float_col] = df[float_col].apply(lambda x: float(float_format % x) if pd.notna(x) else x)
 
     return df

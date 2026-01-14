@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Iterator
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -160,7 +160,7 @@ class CatalogueResponse(BaseModel):
         """Return number of indicators."""
         return len(self.indicators)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Indicator]:  # type: ignore[override]
         """Iterate over indicators."""
         return iter(self.indicators)
 

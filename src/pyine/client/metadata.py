@@ -2,6 +2,7 @@
 
 import logging
 from typing import Any, Dict, List, Union, cast
+from datetime import datetime
 
 from pyine.client.base import INEClient
 from pyine.models.indicator import (
@@ -156,6 +157,23 @@ class MetadataClient(INEClient):
                 unit = response.get("unidade")
                 source = response.get("fonte")
                 notes = response.get("notas")
+                description = response.get("descricao")
+                theme = response.get("tema")
+                subtheme = response.get("subtema")
+                periodicity = response.get("periodicidade")
+                last_period = response.get("ultimoPeriodo")
+                geo_last_level = response.get("geoUltimoNivel")
+                html_url = response.get("urlHtml")
+                metadata_url = response.get("urlMeta")
+                data_url = response.get("urlDados")
+
+                last_update_str = response.get("ultimaActualizacao")
+                last_update = None
+                if last_update_str:
+                    try:
+                        last_update = datetime.fromisoformat(last_update_str)
+                    except ValueError:
+                        logger.warning(f"Could not parse last_update: {last_update_str}")
 
                 # Parse dimensions
                 dimensions = []
@@ -173,6 +191,16 @@ class MetadataClient(INEClient):
                     unit=unit,
                     source=source,
                     notes=notes,
+                    description=description,
+                    theme=theme,
+                    subtheme=subtheme,
+                    periodicity=periodicity,
+                    last_period=last_period,
+                    last_update=last_update,
+                    geo_last_level=geo_last_level,
+                    html_url=html_url,
+                    metadata_url=metadata_url,
+                    data_url=data_url,
                 )
             else:
                 # This case should ideally not be reached after the list check
