@@ -1,8 +1,8 @@
-# pyine - INE Portugal API Client
+# pyptine - INE Portugal API Client
 
-[![PyPI version](https://badge.fury.io/py/pyine.svg)](https://badge.fury.io/py/pyine)
-[![Build Status](https://github.com/nigelrandsley/pyine/actions/workflows/tests.yml/badge.svg)](https://github.com/nigelrandsley/pyine/actions/workflows/tests.yml)
-[![codecov](https://codecov.io/gh/nigelrandsley/pyine/branch/main/graph/badge.svg?token=YOUR_CODECOV_TOKEN)](https://codecov.io/gh/nigelrandsley/pyine)
+[![PyPI version](https://badge.fury.io/py/pyptine.svg)](https://badge.fury.io/py/pyptine)
+[![Build Status](https://github.com/nigelrandsley/pyptine/actions/workflows/tests.yml/badge.svg)](https://github.com/nigelrandsley/pyptine)
+[![codecov](https://codecov.io/gh/nigelrandsley/pyptine/branch/main/graph/badge.svg?token=YOUR_CODECOV_TOKEN)](https://codecov.io/gh/nigelrandsley/pyptine)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -21,19 +21,19 @@ High-level Python client for Statistics Portugal (INE) API. Query and download s
 ## Installation
 
 ```bash
-pip install pyine
+pip install pyptine
 ```
 
 For development, install with all extra dependencies:
 
 ```bash
-pip install "pyine[dev,docs]"
+pip install "pyptine[dev,docs]"
 ```
 
 ## Quick Start
 
 ```python
-from pyine import INE
+from pyptine import INE
 
 # Initialize the client
 ine = INE(language="EN")
@@ -63,26 +63,26 @@ print("Done!")
 
 ## Command-Line Usage
 
-The `pyine` CLI provides a convenient way to access INE data from your terminal.
+The pyptine CLI provides a convenient way to access INE data from your terminal.
 
 ```bash
 # Search for indicators related to "pib" (GDP in Portuguese)
-pyine search "pib"
+pyptine search "pib"
 
 # Get detailed information about a specific indicator
-pyine info 0004127
+pyptine info 0004127
 
 # Download data for an indicator to a CSV file
-pyine download 0004127 --output data.csv
+pyptine download 0004127 --output data.csv
 
 # Download data and filter by dimensions
-pyine download 0004167 --output filtered_data.csv -d Dim1=2023 -d Dim2=1
+pyptine download 0004167 --output filtered_data.csv -d Dim1=2023 -d Dim2=1
 
 # List all available statistical themes
-pyine list-commands themes
+pyptine list-commands themes
 
 # Clear the local cache
-pyine cache clear
+pyptine cache clear
 ```
 
 ## Documentation
@@ -92,7 +92,7 @@ pyine cache clear
 The `INE` class is the main entry point.
 
 ```python
-from pyine import INE
+from pyptine import INE
 from pathlib import Path
 
 # Default client (language='EN', caching=True)
@@ -226,8 +226,8 @@ To set up the development environment:
 
 ```bash
 # Clone the repository
-git clone https://github.com/nigelrandsley/pyine.git
-cd pyine
+git clone https://github.com/nigelrandsley/pyptine.git
+cd pyptine
 
 # Install in editable mode with development dependencies
 pip install -e ".[dev]"
@@ -243,7 +243,7 @@ pre-commit install
 pytest
 
 # Run tests with coverage report
-pytest --cov=src/pyine --cov-report=term-missing
+pytest --cov=src/pyptine --cov-report=term-missing
 ```
 
 ### Code Quality

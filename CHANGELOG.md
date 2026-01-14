@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Python 3.8 Compatibility**:
-  - Resolved `TypeError: 'type' object is not subscriptable` by replacing `tuple` with `typing.Tuple` in `src/pyine/processors/csv.py`.
-  - Fixed `NameError` for `Union`, `Path`, and `DataResponse` by adding missing imports in `src/pyine/client/metadata.py`, `src/pyine/client/data.py`, and `src/pyine/ine.py` respectively.
+  - Resolved `TypeError: 'type' object is not subscriptable` by replacing `tuple` with `typing.Tuple` in `src/pyptine/processors/csv.py`.
+  - Fixed `NameError` for `Union`, `Path`, and `DataResponse` by adding missing imports in `src/pyptine/client/metadata.py`, `src/pyptine/client/data.py`, and `src/pyptine/ine.py` respectively.
 - **Code Style**:
-  - Ran `black` on `src/pyine/processors/dataframe.py` to fix formatting issues.
-  - Removed redundant `type: str` comments in `src/pyine/processors/excel.py`.
+  - Ran `black` on `src/pyptine/processors/dataframe.py` to fix formatting issues.
+  - Removed redundant `type: str` comments in `src/pyptine/processors/excel.py`.
 
 ### Refactored
 
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Indicator Model**: Added a `source` field to the `Indicator` Pydantic model to better reflect API responses.
-- **CLI Parameters**: Renamed `format` parameter to `output_format` in `pyine download` command to avoid shadowing Python's built-in `format` function.
+- **CLI Parameters**: Renamed `format` parameter to `output_format` in `pyptine download` command to avoid shadowing Python's built-in `format` function.
 - **CLI Commands**: Renamed `list` command group to `list-commands` to avoid shadowing Python's built-in `list` function.
 
 ### Added
@@ -48,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All 133 tests pass successfully (82% coverage)
 - Updated CI/CD to test Python 3.8-3.14
 - Added compatibility documentation
-- Initial release of pyine
+- Initial release of pyptine
 - High-level `INE` class for easy API access
 - Support for English and Portuguese languages
 - Multiple output formats (DataFrame, JSON, CSV, dict)
@@ -85,4 +85,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project summary document
 - Three example files (basic usage, advanced filtering, CLI examples)
 
-[0.1.0]: https://github.com/nigelrandsley/pyine/releases/tag/v0.1.0
+[0.1.0]: https://github.com/nigelrandsley/pyptine/releases/tag/v0.1.0

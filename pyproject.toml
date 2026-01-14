@@ -56,7 +56,7 @@ docs = [
 ]
 
 [project.scripts]
-pyine = "pyine.cli.main:cli"
+pyptine = "pyine.cli.main:cli"
 
 [project.urls]
 Homepage = "https://github.com/nigelrandsley/pyine"

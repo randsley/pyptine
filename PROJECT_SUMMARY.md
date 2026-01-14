@@ -1,8 +1,8 @@
-# pyine - Project Summary
+# pyptine - Project Summary
 
 ## Overview
 
-**pyine** is a high-level Python client for the INE Portugal (Statistics Portugal) API. It provides a simple, intuitive interface to query and download statistical data from https://www.ine.pt.
+**pyptine** is a high-level Python client for the INE Portugal (Statistics Portugal) API. It provides a simple, intuitive interface to query and download statistical data from https://www.ine.pt.
 
 ## Project Statistics
 

@@ -8,7 +8,7 @@ This document verifies that all required and recommended files are present for p
 - [x] **LICENSE** - MIT License
 - [x] **pyproject.toml** - Modern Python packaging configuration
 - [x] **.gitignore** - Excludes unnecessary files
-- [x] **Source code** - `src/pyine/` directory with 25 modules
+- [x] **Source code** - `src/pyptine/` directory with 25 modules
 - [x] **Tests** - `tests/` directory with 133 tests (82% coverage)
 
 ## ✅ Recommended Files (All Present)
@@ -25,7 +25,7 @@ This document verifies that all required and recommended files are present for p
 ## 📁 Directory Structure
 
 ```
-pyine/
+pyptine/
 ├── .github/                      ✅ GitHub configuration
 │   ├── workflows/
 │   │   └── tests.yml            ✅ CI/CD workflow
@@ -34,7 +34,7 @@ pyine/
 │   │   └── feature_request.md   ✅ Feature template
 │   └── pull_request_template.md ✅ PR template
 │
-├── src/pyine/                    ✅ Source code (1,265 lines)
+├── src/pyptine/                    ✅ Source code (1,265 lines)
 │   ├── __init__.py
 │   ├── __version__.py
 │   ├── ine.py                   ✅ Main API class
@@ -84,7 +84,7 @@ pyine/
 Before pushing to GitHub, verify:
 
 - [x] All tests pass: `pytest`
-- [x] Coverage above 80%: `pytest --cov=src/pyine`
+- [x] Coverage above 80%: `pytest --cov=src/pyptine`
 - [x] Code formatted: `black src/ tests/`
 - [x] Linting passed: `ruff check src/ tests/`
 - [x] Type checking addressed: `mypy src/`
@@ -100,22 +100,22 @@ The repository contains all required and recommended files for a professional Gi
 
 1. **Initialize git** (if not already done):
    ```bash
-   cd /Users/nigelrandsley/pyine
+   cd /Users/nigelrandsley/pyptine
    git init
    git add .
-   git commit -m "Initial commit: pyine v0.1.0"
+   git commit -m "Initial commit: pyptine v0.1.0"
    ```
 
 2. **Create GitHub repository**:
    - Go to https://github.com/new
-   - Name: `pyine`
+   - Name: `pyptine`
    - Description: "High-level Python client for INE Portugal (Statistics Portugal) API"
    - Public/Private: Choose based on preference
    - Don't initialize with README (we have one)
 
 3. **Push to GitHub**:
    ```bash
-   git remote add origin https://github.com/YOUR_USERNAME/pyine.git
+   git remote add origin https://github.com/YOUR_USERNAME/pyptine.git
    git branch -M main
    git push -u origin main
    ```

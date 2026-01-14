@@ -1,6 +1,6 @@
-# Contributing to pyine
+# Contributing to pyptine
 
-Thank you for your interest in contributing to pyine! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to pyptine! This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
 
@@ -16,7 +16,7 @@ Before creating bug reports, please check existing issues to avoid duplicates. W
 - **Steps to reproduce** the issue
 - **Expected behavior** vs actual behavior
 - **Python version** and operating system
-- **pyine version** you're using
+- **pyptine version** you're using
 - **Code samples** or error messages if applicable
 
 ### Suggesting Enhancements
@@ -47,8 +47,8 @@ Enhancement suggestions are welcome! Please provide:
 
 1. **Clone your fork**:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/pyine.git
-   cd pyine
+   git clone https://github.com/YOUR_USERNAME/pyptine.git
+   cd pyptine
    ```
 
 2. **Create a virtual environment**:
@@ -106,7 +106,7 @@ mypy src/ --ignore-missing-imports
 pytest
 
 # Run with coverage
-pytest --cov=src/pyine --cov-report=html
+pytest --cov=src/pyptine --cov-report=html
 
 # Run specific test file
 pytest tests/test_client/test_base.py
@@ -227,8 +227,8 @@ If you have questions:
 
 ## License
 
-By contributing to pyine, you agree that your contributions will be licensed under the MIT License.
+By contributing to pyptine, you agree that your contributions will be licensed under the MIT License.
 
 ---
 
-Thank you for contributing to pyine! 🎉
+Thank you for contributing to pyptine! 🎉
