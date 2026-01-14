@@ -82,6 +82,91 @@ def json_to_dataframe(
         logger.error(f"Failed to convert data to DataFrame: {str(e)}")
         raise DataProcessingError(f"Failed to convert to DataFrame: {str(e)}") from e
 
+    """DataFrame processing utilities for pyine."""
+
+
+import logging
+from typing import Any, Dict, List, Optional, Union, cast
+
+import pandas as pd
+
+from pyine.utils.exceptions import DataProcessingError
+
+logger = logging.getLogger(__name__)
+
+
+def json_to_dataframe(
+    data: Union[List[Dict[str, Any]], Dict[str, Any]],
+    normalize: bool = True,
+    parse_dates: bool = True,
+) -> pd.DataFrame:
+    """Convert INE JSON data to pandas DataFrame.
+
+    Args:
+        data: Raw JSON data from API (list of dicts or dict with 'dados' key)
+        normalize: Flatten nested structures
+        parse_dates: Attempt to parse date columns
+
+    Returns:
+        Processed DataFrame
+
+    Raises:
+        DataProcessingError: If conversion fails
+
+    Example:
+        >>> data = [
+        ...     {"periodo": "2023", "geocod": "1", "valor": "10639726"},
+        ...     {"periodo": "2022", "geocod": "1", "valor": "10467366"},
+        ... ]
+        >>> df = json_to_dataframe(data)
+        >>> print(df.head())
+    """
+    try:
+        # Handle dict with 'dados' key (full API response)
+        # If data is a dict without 'dados', treat it as a single data point
+        if isinstance(data, dict):
+            data = data.get("dados", [data])
+
+        # Handle empty data
+        if not data:
+            logger.warning("Empty data provided, returning empty DataFrame")
+            return pd.DataFrame()
+
+        # Convert to DataFrame
+        df = pd.DataFrame(data)
+
+        if df.empty:
+            return df
+
+        # Clean up column names (remove internal prefixes)
+        df.columns = [col.replace("_", " ").strip() for col in df.columns]
+
+        # Convert value column to numeric
+        value_cols = [col for col in df.columns if "valor" in col.lower() or col.lower() == "value"]
+        for col in value_cols:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        # Parse date columns if requested
+        if parse_dates:
+            date_cols = [
+                col
+                for col in df.columns
+                if any(
+                    keyword in col.lower()
+                    for keyword in ["periodo", "period", "date", "ano", "year"]
+                )
+            ]
+            for col in date_cols:
+                df[col] = _parse_date_column(df[col])
+
+        logger.debug(f"Converted data to DataFrame with shape {df.shape}")
+
+        return df
+
+    except Exception as e:
+        logger.error(f"Failed to convert data to DataFrame: {str(e)}")
+        raise DataProcessingError(f"Failed to convert to DataFrame: {str(e)}") from e
+
 
     """DataFrame processing utilities for pyine."""
 

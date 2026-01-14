@@ -99,7 +99,9 @@ class DataResponse(BaseModel):
             "language": self.language,
             "extraction_date": self.extraction_date.isoformat(),
         }
-        export_to_csv(df, Path(filepath), include_metadata=include_metadata, metadata=metadata, **kwargs)
+        export_to_csv(
+            df, Path(filepath), include_metadata=include_metadata, metadata=metadata, **kwargs
+        )
 
     def to_json(
         self,

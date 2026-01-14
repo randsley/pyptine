@@ -112,13 +112,9 @@ def search(
             click.echo(f"    Theme: {ind.theme}")
         if ind.description:
             # Truncate long descriptions
-            desc = (
-                ind.description[:100] + "..." if len(ind.description) > 100 else ind.description
-            )
+            desc = ind.description[:100] + "..." if len(ind.description) > 100 else ind.description
             click.echo(f"    {desc}")
         click.echo()
-
-
 
 
 @cli.command()
@@ -175,7 +171,6 @@ def info(varcd: str, lang: str) -> None:
             click.echo(f"  - {dim.name} ({len(dim.values)} values)")
 
     click.echo()
-
 
 
 @cli.command()
@@ -311,7 +306,6 @@ def dimensions(varcd: str, lang: str) -> None:
         click.echo()
 
 
-
 @cli.group()
 def list_commands() -> None:
     """List themes and indicators.
@@ -350,7 +344,6 @@ def list_themes(lang: str) -> None:
         click.echo(f"  • {theme}")
 
     click.echo()
-
 
 
 @list_commands.command(name="indicators")

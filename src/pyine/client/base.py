@@ -11,6 +11,7 @@ from urllib3.util.retry import Retry
 
 from pyine.cache.disk import DiskCache
 from pyine.utils.exceptions import APIError, RateLimitError
+from pyine.__version__ import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class INEClient:
     BASE_URL = "https://www.ine.pt"
     DEFAULT_TIMEOUT = 30
     MAX_RETRIES = 3
-    USER_AGENT = "pyine/0.1.0 (Python INE API Client)"
+    USER_AGENT = f"pyine/{__version__} (Python INE API Client)"
 
     def __init__(
         self,

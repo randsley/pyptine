@@ -140,7 +140,9 @@ class CatalogueBrowser:
 
             filtered_indicators.append(indicator)
 
-        logger.debug(f"Search for '{query}' with theme '{theme}' found {len(filtered_indicators)} results")
+        logger.debug(
+            f"Search for '{query}' with theme '{theme}' found {len(filtered_indicators)} results"
+        )
         return filtered_indicators
 
     def _matches_query(

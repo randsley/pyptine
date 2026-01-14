@@ -230,8 +230,12 @@ class CatalogueClient(INEClient):
             html_url = self._get_element_text(html_elem, "bdd_url") if html_elem is not None else ""
 
             json_elem = indicator_elem.find("json")
-            metadata_url = self._get_element_text(json_elem, "json_metainfo") if json_elem is not None else ""
-            data_url = self._get_element_text(json_elem, "json_dataset") if json_elem is not None else ""
+            metadata_url = (
+                self._get_element_text(json_elem, "json_metainfo") if json_elem is not None else ""
+            )
+            data_url = (
+                self._get_element_text(json_elem, "json_dataset") if json_elem is not None else ""
+            )
 
             # Parse last_period and last_update from <dates>
             last_period = None
