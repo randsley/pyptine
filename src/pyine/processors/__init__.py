@@ -1,10 +1,12 @@
 """Data processing utilities for pyine package."""
 
 from pyine.processors.csv import (
-    export_multiple_sheets,
     export_to_csv,
-    format_for_excel,
     read_csv_with_metadata,
+)
+from pyine.processors.excel import (
+    export_multiple_sheets,
+    format_for_excel,
 )
 from pyine.processors.dataframe import (
     aggregate_by_period,
