@@ -75,8 +75,8 @@ class TestINEIntegration:
 
         # Get metadata
         metadata = ine.get_metadata("0004167")
-        assert metadata.indicator_code == "0004167"
-        assert metadata.indicator_name
+        assert metadata.varcd == "0004167"
+        assert metadata.title
         assert len(metadata.dimensions) > 0
 
         # Get dimensions

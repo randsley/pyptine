@@ -30,7 +30,7 @@ class TestDataClient:
         response = data_client.get_data("0004167")
 
         assert isinstance(response, DataResponse)
-        assert response.indicator_code == "0004167"
+        assert response.varcd == "0004167"
         assert response.language == "EN"
         assert len(response.data) > 0
 
@@ -48,7 +48,7 @@ class TestDataClient:
         response = data_client.get_data("0004167", dimensions=dimensions)
 
         assert isinstance(response, DataResponse)
-        assert response.indicator_code == "0004167"
+        assert response.varcd == "0004167"
 
         # Verify the request was made with correct parameters
         assert len(responses.calls) == 1

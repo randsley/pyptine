@@ -33,7 +33,7 @@ class TestMetadataClient:
 
         # Verify response
         assert isinstance(metadata, IndicatorMetadata)
-        assert metadata.indicator_code == "0004167"
+        assert metadata.varcd == "0004167"
         assert metadata.language == "EN"
         assert len(metadata.dimensions) == 2
 
@@ -110,8 +110,8 @@ class TestMetadataClient:
 
         metadata = metadata_client.get_metadata("0004167")
 
-        assert metadata.indicator_code == "0004167"
-        assert metadata.indicator_name == "Test Indicator"
+        assert metadata.varcd == "0004167"
+        assert metadata.title == "Test Indicator"
         assert metadata.unit is None
         assert metadata.source is None
         assert len(metadata.dimensions) == 0

@@ -43,8 +43,8 @@ class DataResponse(BaseModel):
     and when the data was retrieved.
     """
 
-    indicator_code: str = Field(..., description="Indicator code")
-    indicator_name: str = Field(..., description="Indicator name")
+    varcd: str = Field(..., description="Indicator code")
+    title: str = Field(..., description="Indicator name")
     language: str = Field(..., description="Language (PT or EN)")
     data: List[Dict[str, Any]] = Field(default_factory=list, description="Raw data points")
     unit: Optional[str] = Field(None, description="Unit of measurement")
@@ -88,8 +88,8 @@ class DataResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "indicator_code": "0004167",
-                "indicator_name": "Resident population",
+                "varcd": "0004167",
+                "title": "Resident population",
                 "language": "EN",
                 "data": [
                     {"Period": "2020", "Geographic localization": "Portugal", "value": 10298252},

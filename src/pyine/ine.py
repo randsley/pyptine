@@ -324,8 +324,8 @@ class INE:
         if include_metadata:
             metadata = self.get_metadata(varcd)
             metadata_dict = {
-                "indicator": metadata.indicator_code,
-                "title": metadata.indicator_name,
+                "indicator": metadata.varcd,
+                "title": metadata.title,
                 "unit": metadata.unit,
                 "source": metadata.source or "INE Portugal",
             }

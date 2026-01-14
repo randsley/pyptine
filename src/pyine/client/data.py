@@ -174,8 +174,8 @@ class DataClient(INEClient):
             DataProcessingError: If parsing fails
         """
         try:
-            indicator_code = varcd
-            indicator_name = ""
+            varcd_val = varcd
+            title = ""
             language = self.language
             unit = None
             data_array = []
@@ -183,11 +183,11 @@ class DataClient(INEClient):
             if isinstance(response, list):
                 # If response is a list, assume it's directly the data array
                 data_array = response
-                # Fetch metadata separately to get indicator_name and unit
+                # Fetch metadata separately to get title and unit
                 if self.metadata_client:
                     try:
                         metadata = self.metadata_client.get_metadata(varcd)
-                        indicator_name = metadata.indicator_name
+                        title = metadata.title
                         unit = metadata.unit
                     except Exception as e:
                         logger.warning(
@@ -198,15 +198,15 @@ class DataClient(INEClient):
                         "MetadataClient not available in DataClient to fetch indicator name and unit."
                     )
 
-                if not indicator_name and data_array:
+                if not title and data_array:
                     # Fallback: try to get unit from first data point if metadata not available
                     first_point = data_array[0]
                     unit = first_point.get("unidade") or first_point.get("unit")
 
             elif isinstance(response, dict):
                 # If response is a dict, parse as before
-                indicator_code = response.get("indicador", "")
-                indicator_name = response.get("nome", "")
+                varcd_val = response.get("indicador", "")
+                title = response.get("nome", "")
                 language = response.get("lang", self.language)
                 unit = response.get("unidade")
                 data_array = response.get("dados", [])
@@ -223,8 +223,8 @@ class DataClient(INEClient):
                     processed_data.append(processed_point)
 
             return DataResponse(
-                indicator_code=indicator_code,
-                indicator_name=indicator_name,
+                varcd=varcd_val,
+                title=title,
                 language=language,
                 data=processed_data,
                 unit=unit,

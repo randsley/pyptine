@@ -71,26 +71,22 @@ class Indicator(BaseModel):
     )
 
 
-class IndicatorMetadata(BaseModel):
+class IndicatorMetadata(Indicator):
     """Complete metadata for an indicator including dimensions.
 
     Extends basic indicator information with dimension definitions
     and other metadata required for data queries.
     """
 
-    indicator_code: str = Field(..., description="Indicator code")
-    indicator_name: str = Field(..., description="Indicator name")
     language: str = Field(..., description="Language (PT or EN)")
     dimensions: List[Dimension] = Field(default_factory=list, description="Available dimensions")
-    unit: Optional[str] = Field(None, description="Unit of measurement")
-    source: Optional[str] = Field(None, description="Data source")
     notes: Optional[str] = Field(None, description="Additional notes")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "indicator_code": "0004167",
-                "indicator_name": "Resident population",
+                "varcd": "0004167",
+                "title": "Resident population",
                 "language": "EN",
                 "dimensions": [
                     {

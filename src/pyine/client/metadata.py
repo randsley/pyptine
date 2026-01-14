@@ -22,7 +22,7 @@ class MetadataClient(INEClient):
     Example:
         >>> client = MetadataClient(language="EN")
         >>> metadata = client.get_metadata("0004167")
-        >>> print(metadata.indicator_name)
+        >>> print(metadata.title)
         'Resident population'
     """
 
@@ -150,8 +150,8 @@ class MetadataClient(INEClient):
 
             if isinstance(response, dict):
                 # Extract basic info
-                indicator_code = response.get("indicador", "")
-                indicator_name = response.get("nome", "")
+                varcd = response.get("indicador", "")
+                title = response.get("nome", "")
                 language = response.get("lang", self.language)
                 unit = response.get("unidade")
                 source = response.get("fonte")
@@ -166,8 +166,8 @@ class MetadataClient(INEClient):
                     dimensions.append(dimension)
 
                 return IndicatorMetadata(
-                    indicator_code=indicator_code,
-                    indicator_name=indicator_name,
+                    varcd=varcd,
+                    title=title,
                     language=language,
                     dimensions=dimensions,
                     unit=unit,
