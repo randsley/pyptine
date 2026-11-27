@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/pyptine.svg)](https://pypi.org/project/pyptine/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![DOI](https://zenodo.org/badge/1133698090.svg)](https://doi.org/10.5281/zenodo.19118875)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19118875.svg)](https://doi.org/10.5281/zenodo.19118875)
 
 High-level Python client for Statistics Portugal (INE) API. Query and download statistical data from [INE Portugal](https://www.ine.pt) with a simple, intuitive interface.
 
@@ -48,7 +48,7 @@ results = ine.search("gdp")
 for indicator in results[:5]:  # Print top 5 results
     print(f"- {indicator.varcd}: {indicator.title}")
 
-# 2. Get data for a specific indicator (without a period filter: the latest period only)
+# 2. Get data: two periods, Portugal (without Dim1, INE returns only the latest period)
 varcd = "0008273"  # Resident population by place of residence, sex and age group
 print(f"\nFetching data for indicator {varcd}...")
 response = ine.get_data(varcd, dimensions={"Dim1": ["S7A2022", "S7A2023"], "Dim2": "PT"})
@@ -468,9 +468,6 @@ cd pyptine
 
 # Install in editable mode with development dependencies
 pip install -e ".[dev]"
-
-# Install pre-commit hooks to ensure code quality
-pre-commit install
 ```
 
 ### Running Tests

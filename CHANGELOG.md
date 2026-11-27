@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 Fixes found by an audit against the live INE API (2026-11-27). Several change behaviour.
+0.3.3 was tagged but never published on PyPI: from PyPI, this release follows 0.3.2, so read
+0.3.3's notes too.
+
+### Upgrading from 0.3.x
+
+What breaks existing code, in short (details below):
+
+- **Python 3.10 or later.**
+- **Filters take INE's codes**: `Dim1` takes the period code (`"S7A2022"`), not the label (`"2022"`); other dimensions take `cat_id` (`DimensionValue.code`), not `categ_cod`. A wrong code raises `DimensionError` naming the valid ones.
+- **Refusals raise**: an unknown indicator or an invalid code raises `INERefusalError` (an `APIError`) instead of returning an empty result. Catch it where you probed codes by fetching them.
+- **Without `Dim1`, INE returns only the latest period** (it always did; pyptine now says so). Ask for periods, or use `get_all_data()`; its `chunk_size` is ignored, use `periods_per_request`.
+- **Rows carry `period` and `period_code`**. The analysis methods sort by `period_code` and refuse data holding several series (several regions or categories per period): filter to one series first.
+- **Geography**: one request returns every level; filter with `at_level()` before adding up. `with_geo_level()`/`at_level()` need the classification, which `get_data` sets (`geo_classification`); pass `classification=` for a `DataResponse` built otherwise.
+- **Removed or changed fields**: `IndicatorMetadata.notes` (INE sends none) and `Indicator.unit` from the catalogue (it has none; the unit is in the metadata). `INE.get_metadata` makes one more request, to the catalogue (`catalogue=False` skips it). `extraction_date` is INE's timestamp, not the local clock.
+- **`processors.dataframe`**: `period_column` defaults to `period_code` and `value_column` to `value` (were `periodo`/`valor`); `json_to_dataframe` takes a list of rows and keeps column names (`period_code`, not `period code`).
+- **Responses INE does not serve are refused**, not parsed: the lower-case `dados`/`dimensoes` format, a bare list of rows, a catalogue answer that is not the entry asked for.
+- `lxml` is no longer installed with pyptine (it was never used).
 
 ### Changed
 

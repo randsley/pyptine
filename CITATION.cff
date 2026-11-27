@@ -9,6 +9,8 @@ authors:
   - family-names: Randsley
     given-names: Nigel
     email: nigel.randsley@protonmail.com
+# Concept DOI: resolves to the latest version archived on Zenodo (one per GitHub release).
+doi: 10.5281/zenodo.19118875
 repository-code: "https://github.com/randsley/pyptine"
 license: MIT
 keywords:
