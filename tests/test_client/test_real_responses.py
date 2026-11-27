@@ -495,6 +495,78 @@ class TestCatalogueProvenance:
         )
 
 
+class TestCatalogueKeywords:
+    """<keywords> is "INE" plus CDATA sections; a CDATA keyword may contain a comma."""
+
+    def get(self, rsps, language):
+        from pyptine.client.catalogue import CatalogueClient
+
+        base, params, body = recorded(f"catalogue_opc1_0008273_{language}.xml")
+        rsps.add(
+            responses.GET,
+            base,
+            body=body,
+            content_type="text/xml;charset=UTF-8",
+            match=[matchers.query_param_matcher(params)],
+        )
+        return CatalogueClient(language=language, cache_enabled=False).get_indicator("0008273")
+
+    def test_english(self, rsps):
+        ind = self.get(rsps, "EN")
+        assert ind.keywords == [
+            "INE",
+            "Resident",
+            "(No.)",
+            "population",
+            "Population",
+            "Population estimates",
+        ]
+
+    def test_portuguese_repeat_dropped(self, rsps):
+        ind = self.get(rsps, "PT")
+        # "População" is both a title word and the theme; kept once, in INE's order.
+        assert ind.keywords == [
+            "INE",
+            "População",
+            "(N.º)",
+            "residente",
+            "Estimativas de população",
+        ]
+
+    def test_comma_inside_cdata_kept(self):
+        from pyptine.client.catalogue import split_keywords
+
+        raw = (
+            "INE,<![CDATA[Expenses,]]>,<![CDATA[and]]>,<![CDATA[Survey]]>,"
+            "<![CDATA[Labour market]]>,<![CDATA[Work organisations]]>"
+        )  # as INE sends for some indicators (2026-11-27)
+        assert split_keywords(raw) == [
+            "INE",
+            "Expenses,",
+            "and",
+            "Survey",
+            "Labour market",
+            "Work organisations",
+        ]
+
+    def test_plain_text_split_on_commas(self):
+        from pyptine.client.catalogue import split_keywords
+
+        assert split_keywords("INE, a ,b,,a") == ["INE", "a", "b"]
+        assert split_keywords("") == []
+
+    def test_search_finds_by_keyword(self, rsps):
+        from pyptine.client.catalogue import CatalogueClient
+        from pyptine.search.catalog import CatalogueBrowser
+
+        ind = self.get(rsps, "EN")
+        browser = CatalogueBrowser(CatalogueClient(cache_enabled=False))
+        browser._cached_indicators = [ind]
+        assert [i.varcd for i in browser.search("estimates", search_fields=["keywords"])] == [
+            "0008273"
+        ]
+
+
 class TestExcelProvenance:
     TWO = TestProvenance.TWO
 

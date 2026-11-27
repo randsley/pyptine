@@ -407,6 +407,9 @@ CATALOGUE_DATE = re.compile(
 )
 
 
+KEYWORDS_SHAPE = re.compile(r"^INE(,<!\[CDATA\[.*?\]\]>)+$", re.S)
+
+
 def parse_catalogue(where: str, xml: str) -> list[ET.Element]:
     root = ET.fromstring(xml)
     if root.tag != "catalog":
@@ -417,7 +420,20 @@ def parse_catalogue(where: str, xml: str) -> list[ET.Element]:
             f"{where}: <extraction_date> {date!r} is not 'Friday, 27 November 2026, "
             "04:17:58.067 PM', which CatalogueResponse parses"
         )
-    return root.findall(".//indicator")
+    inds = root.findall(".//indicator")
+    # CatalogueClient splits <keywords> on its raw CDATA boundaries, matched to each
+    # <indicator id=...> by a regex over the raw XML: check that shape.
+    raw = re.findall(r"<keywords>(.*?)</keywords>", xml, re.S)
+    ids = re.findall(r'<indicator\b[^>]*?\bid="([^"]*)"', xml)
+    if len(raw) != len(inds) or len(ids) != len(inds):
+        error(
+            f"{where}: {len(inds)} <indicator>, {len(ids)} with an id attribute, {len(raw)} "
+            "<keywords>; CatalogueClient expects one of each per indicator"
+        )
+    odd = [k for k in raw if not KEYWORDS_SHAPE.match(k.strip())]
+    if odd:
+        error(f"{where}: {len(odd)} <keywords> not 'INE,<![CDATA[..]]>,...', e.g. {odd[0][:80]!r}")
+    return inds
 
 
 def check_catalogue_entry() -> None:

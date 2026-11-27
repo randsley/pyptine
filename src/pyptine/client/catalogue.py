@@ -1,6 +1,8 @@
 """Catalogue client for INE Portugal API."""
 
+import html
 import logging
+import re
 from datetime import datetime
 from typing import Any, Optional, cast
 from xml.etree import ElementTree as ET
@@ -12,6 +14,41 @@ from pyptine.provenance import parse_catalogue_date, request_url
 from pyptine.utils.exceptions import DataProcessingError
 
 logger = logging.getLogger(__name__)
+
+# <keywords> is a bare "INE" then CDATA sections: three words cut from the title, punctuation
+# included ("Expenses,", "2021)"), then the theme and the subtheme. A CDATA keyword may itself
+# contain a comma (2,642 of 13,290 indicators on 2026-11-27, either language), and ElementTree
+# merges the sections into one text, so keywords are split on the raw CDATA boundaries.
+_INDICATOR = re.compile(r'<indicator\b[^>]*?\bid="([^"]*)"[^>]*>(.*?)</indicator>', re.S)
+_KEYWORDS = re.compile(r"<keywords>(.*?)</keywords>", re.S)
+_KEYWORD_PART = re.compile(r"<!\[CDATA\[(.*?)\]\]>|([^,<]+)", re.S)
+
+
+def split_keywords(raw: str) -> list[str]:
+    """INE's keywords from the inside of one ``<keywords>`` element.
+
+    Each CDATA section is one keyword, commas and all; plain text between them is split on
+    commas. Whitespace is trimmed; empty and repeated keywords are dropped (theme and
+    subtheme are often equal); INE's order is kept.
+    """
+    out: list[str] = []
+    for m in _KEYWORD_PART.finditer(raw):
+        cdata, plain = m.group(1), m.group(2)
+        parts = [cdata] if cdata is not None else (plain or "").split(",")
+        for part in parts:
+            word = html.unescape(part).strip() if cdata is None else part.strip()
+            if word and word not in out:
+                out.append(word)
+    return out
+
+
+def raw_keywords(xml: str) -> list[tuple[str, list[str]]]:
+    """``(indicator id, keywords)`` for each ``<indicator>`` in a catalogue, in order."""
+    result = []
+    for m in _INDICATOR.finditer(xml):
+        kw = _KEYWORDS.search(m.group(2))
+        result.append((m.group(1), split_keywords(kw.group(1)) if kw else []))
+    return result
 
 
 class CatalogueClient(INEClient):
@@ -80,8 +117,12 @@ class CatalogueClient(INEClient):
             List of Indicator objects
 
         Note:
-            This can return a large number of indicators. Consider using
-            the search functionality instead for specific queries.
+            INE's main group (``opc=3``, 309 indicators on 2026-11-27) localises only
+            ``theme`` and ``subtheme``: its titles and descriptions are **Portuguese under
+            either language**. It is also not all of INE (indicators leave it while still
+            served). For English titles, or every indicator, use
+            :meth:`get_complete_catalogue` (``opc=2``) or :meth:`get_indicator` (``opc=1``),
+            which honour the language.
 
         Example:
             >>> client = CatalogueClient()
@@ -234,13 +275,27 @@ class CatalogueClient(INEClient):
 
             logger.debug(f"Found {len(indicator_elements)} indicator(s) in XML")
 
-            for indicator_elem in indicator_elements:
+            keywords = raw_keywords(xml_string)
+            if len(keywords) != len(indicator_elements):
+                raise DataProcessingError(
+                    f"Catalogue has {len(indicator_elements)} <indicator> elements but "
+                    f"{len(keywords)} could be matched to their raw <keywords>"
+                )
+
+            for indicator_elem, (kw_varcd, kws) in zip(indicator_elements, keywords):
                 indicator = self._parse_indicator_xml(indicator_elem)
                 if indicator:
-                    indicators.append(indicator)
+                    if kw_varcd != indicator.varcd:
+                        raise DataProcessingError(
+                            f"Catalogue keywords out of step: <indicator id={kw_varcd!r}> "
+                            f"parsed as {indicator.varcd!r}"
+                        )
+                    indicators.append(indicator.model_copy(update={"keywords": kws}))
 
             return indicators
 
+        except DataProcessingError:
+            raise
         except ET.ParseError as e:
             logger.error(f"XML parsing error: {str(e)}")
             raise DataProcessingError(f"Invalid XML response: {str(e)}") from e
