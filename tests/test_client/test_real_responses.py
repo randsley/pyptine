@@ -349,10 +349,34 @@ class TestProvenance:
         two = client().get_data("0008273", self.TWO)
         assert ine_citation(latest, two) == (
             "Source: Statistics Portugal (INE), indicator 0008273, "
-            "reference periods 2021, 2022, 2023, extracted 2026-11-27."
+            "reference periods 2021 to 2023, extracted 2026-11-27."
         )
         with pytest.raises(ValueError, match="nothing to cite"):
             ine_citation()
+
+    def test_period_ranges(self):
+        """Runs of three or more consecutive periods become "first to last" (real labels)."""
+        from pyptine.provenance import period_ranges
+
+        def labels(name: str) -> dict[str, str]:
+            meta = MetadataClient(cache_enabled=False)._parse_metadata_response(
+                json.loads((FIXTURES / name).read_bytes())
+            )
+            return {v.code: v.label for v in meta.dimensions[0].values}
+
+        quarters = labels("meta_0012234_EN.json")  # 27 quarters, S5A20194-S5A20262
+        assert period_ranges(quarters) == ["4th Quarter 2019 to 2nd Quarter 2026"]
+        years = labels("meta_0008273_EN.json")
+        gap = {c: years[c] for c in ("S7A2011", "S7A2012", "S7A2013", "S7A2015", "S7A2016")}
+        assert period_ranges(gap) == ["2011 to 2013", "2015", "2016"]
+        months = {f"S3A2026{m:02d}": f"m{m}" for m in range(1, 10)}
+        assert period_ranges(months) == ["m1 to m9"]
+        # A code of a form whose position is not known is listed as it is, never ranged.
+        assert period_ranges({"S7A2021": "2021", "S7A2022": "2022", "X1": "x"}) == [
+            "2021",
+            "2022",
+            "x",
+        ]
 
     def test_missing_extraction_date_refused(self, rsps):
         from pyptine.utils.exceptions import DataProcessingError

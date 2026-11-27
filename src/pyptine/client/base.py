@@ -4,7 +4,7 @@ import logging
 import time
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from xml.etree import ElementTree as ET
 
 import requests
@@ -14,22 +14,10 @@ from pyptine.__version__ import __version__
 from pyptine.cache.disk import DiskCache
 from pyptine.client import retry
 from pyptine.client.parsing import check_catalogue_body, check_success
+from pyptine.client.retry import JSONBody
 from pyptine.utils.exceptions import APIError, RateLimitError
 
 logger = logging.getLogger(__name__)
-
-# Import cache - delay to avoid circular imports
-_disk_cache = None
-
-
-def _get_disk_cache() -> type[DiskCache]:
-    """Lazy import of DiskCache to avoid circular imports."""
-    global _disk_cache
-    if _disk_cache is None:
-        from pyptine.cache.disk import DiskCache
-
-        _disk_cache = DiskCache
-    return _disk_cache
 
 
 class INEClient:
@@ -73,8 +61,13 @@ class INEClient:
         max_retries: int = MAX_RETRIES,
         retry_delays: Sequence[float] | None = None,
         cache_ttl: int | None = None,
+        cache: DiskCache | None = None,
     ) -> None:
-        """Initialize INE client."""
+        """Initialize INE client.
+
+        ``cache`` is an existing DiskCache to share (INE gives its four clients one); without
+        it, a client opens its own from ``cache_dir`` and ``cache_ttl``.
+        """
         self.language = language.upper()
         self.timeout = timeout
         self.cache_enabled = cache_enabled
@@ -88,12 +81,13 @@ class INEClient:
             raise ValueError(f"Language must be 'EN' or 'PT', got: {language}")
 
         # Initialize cache if enabled
-        if self.cache_enabled:
-            disk_cache = _get_disk_cache()
+        if self.cache_enabled and cache is not None:
+            self.cache = cache
+        elif self.cache_enabled:
             if cache_ttl is None:
-                self.cache = disk_cache(cache_dir=cache_dir)
+                self.cache = DiskCache(cache_dir=cache_dir)
             else:
-                self.cache = disk_cache(cache_dir=cache_dir, data_ttl=cache_ttl)
+                self.cache = DiskCache(cache_dir=cache_dir, data_ttl=cache_ttl)
             logger.debug(f"Cache enabled at: {self.cache.get_cache_dir()}")
 
         # Initialize session
@@ -133,11 +127,11 @@ class INEClient:
 
         # Use data cache for data endpoint
         if "pindica.jsp" in endpoint:
-            return cast(requests.Session, self.cache.get_data_session())
+            return self.cache.get_data_session()
 
         # Use metadata cache for metadata and catalogue endpoints
         elif "pindicaMeta.jsp" in endpoint or "xml_indic.jsp" in endpoint:
-            return cast(requests.Session, self.cache.get_metadata_session())
+            return self.cache.get_metadata_session()
 
         # Default to regular session for unknown endpoints
         else:
@@ -153,7 +147,7 @@ class INEClient:
         params: dict[str, Any] | None = None,
         response_format: str = "json",
         progress_callback: Any | None = None,
-    ) -> dict[str, Any] | str:
+    ) -> JSONBody | str:
         """Make HTTP request to INE API, retrying INE's transient failures.
 
         Args:
@@ -201,7 +195,7 @@ class INEClient:
         params: dict[str, Any],
         response_format: str,
         progress_callback: Any | None,
-    ) -> dict[str, Any] | str:
+    ) -> JSONBody | str:
         """One request. Raises retry.RetryableError for a failure worth repeating."""
         timeout = (retry.connect_timeout(self.timeout), self.timeout)
         attempts = len(self._waits()) + 1
@@ -243,7 +237,7 @@ class INEClient:
             check_catalogue_body(response.content, str(params.get("varcd", "")), response.url)
         try:
             if response_format == "json":
-                body: dict[str, Any] | str = self._parse_json_response(response)
+                body: JSONBody | str = self._parse_json_response(response)
             else:
                 body = self._parse_xml_response(response)
                 ET.fromstring(body)  # a truncated catalogue must not be returned or cached
@@ -280,16 +274,16 @@ class INEClient:
             except Exception as e:  # the retry still happens; the stale entry would expire
                 logger.warning(f"Could not drop a malformed response from the cache: {e}")
 
-    def _parse_json_response(self, response: requests.Response) -> dict[str, Any]:
+    def _parse_json_response(self, response: requests.Response) -> JSONBody:
         """Parse JSON response.
 
         Raises:
             APIError: If JSON parsing fails
         """
         try:
-            data = response.json()
+            data: JSONBody = response.json()
             logger.debug("Parsed JSON response of %d bytes", len(response.content))
-            return cast(dict[str, Any], data)
+            return data
         except ValueError as e:
             logger.error(f"Failed to parse JSON response: {str(e)}")
             raise APIError(0, f"Invalid JSON response: {str(e)}") from e

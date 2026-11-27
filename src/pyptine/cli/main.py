@@ -32,6 +32,7 @@ from pyptine.cli.utils import (
     print_success,
     spinner_task,
 )
+from pyptine.client.retry import DEFAULT_TIMEOUT
 from pyptine.utils.exceptions import INEError
 
 
@@ -99,8 +100,10 @@ def cli(ctx: Context) -> None:  # type: ignore[misc]
     "--timeout",
     "-w",
     type=int,
-    default=10,
-    help="Request timeout in seconds (default: 10)",
+    default=DEFAULT_TIMEOUT,
+    show_default=True,
+    help="Read timeout per request, in seconds. INE's gateway gives up after 120 s, and a "
+    "read timeout is not retried, so keep it above that",
 )
 @handle_exceptions
 def search(
@@ -118,7 +121,7 @@ def search(
         pyptine search "gdp"
         pyptine search "population" --theme "Population"
         pyptine search "employment" --lang PT --limit 10
-        pyptine search "gdp" --timeout 20
+        pyptine search "gdp" --timeout 200
     """
     ine = INE(language=lang, cache=True, timeout=timeout)
 

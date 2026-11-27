@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Literal
 
+from pyptine.cache.disk import DiskCache
 from pyptine.client.base import INEClient
 from pyptine.client.catalogue import CatalogueClient
 from pyptine.client.data import DataClient
@@ -78,12 +79,22 @@ class INE:
         self.cache_enabled = cache
         self.cache_dir = cache_dir
 
+        # One disk cache for all four clients (each used to open its own, on the same files).
+        shared: DiskCache | None = None
+        if cache:
+            shared = (
+                DiskCache(cache_dir=cache_dir)
+                if cache_ttl is None
+                else DiskCache(cache_dir=cache_dir, data_ttl=cache_ttl)
+            )
+
         # Initialize base client
         self.base_client = INEClient(
             language=self.language,
             timeout=timeout,
             cache_enabled=cache,
             cache_dir=cache_dir,
+            cache=shared,
         )
 
         # Initialize specialized clients
@@ -92,6 +103,7 @@ class INE:
             timeout=timeout,
             cache_enabled=cache,
             cache_dir=cache_dir,
+            cache=shared,
         )
 
         self.metadata_client = MetadataClient(
@@ -99,6 +111,7 @@ class INE:
             timeout=timeout,
             cache_enabled=cache,
             cache_dir=cache_dir,
+            cache=shared,
         )
 
         self.data_client = DataClient(
@@ -106,6 +119,7 @@ class INE:
             timeout=timeout,
             cache_enabled=cache,
             cache_dir=cache_dir,
+            cache=shared,
             metadata_client=self.metadata_client,  # Pass metadata_client
             cache_ttl=cache_ttl,
         )

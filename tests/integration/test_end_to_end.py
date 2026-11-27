@@ -209,6 +209,21 @@ class TestINEIntegration:
         # Invalid indicator
         assert not ine.validate_indicator("invalid_code")
 
+    def test_one_cache_for_all_clients(self, tmp_path):
+        """INE opens one DiskCache (two SQLite sessions), not one per client."""
+        ine = INE(language="EN", cache=True, cache_dir=tmp_path, cache_ttl=60)
+        clients = (
+            ine.base_client,
+            ine.catalogue_client,
+            ine.metadata_client,
+            ine.data_client,
+            ine.data_client.metadata_client,
+        )
+        assert len({id(c.cache) for c in clients}) == 1
+        assert ine.data_client.cache.data_ttl == 60
+        assert ine.data_client.cache.get_cache_dir() == tmp_path
+        assert all(c.cache is None for c in (INE(cache=False).base_client,))
+
     def test_cache_management(self, tmp_path):
         """Test cache management."""
         # Initialize with cache

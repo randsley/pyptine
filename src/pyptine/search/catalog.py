@@ -275,17 +275,10 @@ class CatalogueBrowser:
         """
         indicators = self.get_all_indicators()
 
-        # Filter indicators with last_update date
-        dated_indicators = [ind for ind in indicators if ind.last_update is not None]
-
-        # Sort by last_update descending
-        sorted_indicators = sorted(
-            dated_indicators,
-            key=lambda x: x.last_update,  # type: ignore
-            reverse=True,
-        )
-
-        return sorted_indicators[:limit]
+        # Only indicators with a last_update, newest first.
+        dated = [(ind.last_update, ind) for ind in indicators if ind.last_update is not None]
+        dated.sort(key=lambda pair: pair[0], reverse=True)
+        return [ind for _, ind in dated[:limit]]
 
     def get_by_code(self, varcd: str) -> Indicator | None:
         """Get indicator by code.

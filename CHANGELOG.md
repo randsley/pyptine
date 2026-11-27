@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`pyptine search` reads with the client's 130 s timeout**, not 10 s. A read timeout is not retried, so the first search (the whole catalogue, ~20 s) could fail; `--timeout` now says it is per read and shows its default.
+- **Citations write runs of periods as ranges**: "reference periods 4th Quarter 2019 to 2nd Quarter 2026" for 27 quarters. A run is three or more consecutive annual (`S7A`), quarterly (`S5A`) or monthly (`S3A`) codes; a gap shows (`2011 to 2013, 2015`), and a code of any other form is listed as it is. New `provenance.period_ranges`.
+- **`INE` opens one disk cache** for its four clients (each opened its own on the same files: eight SQLite connections, and only the data client honoured `cache_ttl`). `INEClient` and `DataClient` take `cache=` to share one.
+- The JSON body type is `JSONBody` (`list | dict`: INE sends a one-element list), no longer declared `dict` behind a `cast`; redundant casts and a `type: ignore` removed.
+
 ### Added
 
 - Live tests (`tests/live/`, run with `pytest -m live`): the users' paths end to end on INE's API (periods, provenance, every geographic level, districts, quarterly series, refusals, catalogue and search, CSV provenance, async against sync). They assert codes and structure, not figures. Weekly in CI (`live.yml`); deselected otherwise.

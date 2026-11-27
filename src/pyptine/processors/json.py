@@ -285,7 +285,8 @@ def merge_json_files(
         >>> files = [Path("data1.json"), Path("data2.json")]
         >>> merge_json_files(files, Path("merged.json"))
 
-    TODO: Implement merging logic based on a `merge_key` parameter for more complex scenarios.
+    Each file's content is kept whole (a list is extended, an object appended), so every
+    exported DataResponse keeps its own provenance; nothing is joined on a key.
     """
     try:
         merged_data = []

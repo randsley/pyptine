@@ -120,6 +120,47 @@ def parse_catalogue_date(value: Any) -> datetime:
     return parsed
 
 
+# Period codes whose position is known, verified 2026-11-27: annual S7A2022, quarterly
+# S5A20261, monthly S3A202601. (kind, position) lets a run of consecutive periods be written as
+# a range; a code of any other form is listed as it is.
+_PERIOD_FORMS = (
+    (re.compile(r"S7A(\d{4})"), "annual", lambda m: int(m[1])),
+    (re.compile(r"S5A(\d{4})([1-4])"), "quarterly", lambda m: int(m[1]) * 4 + int(m[2])),
+    (re.compile(r"S3A(\d{4})(0[1-9]|1[0-2])"), "monthly", lambda m: int(m[1]) * 12 + int(m[2])),
+)
+
+
+def _period_position(code: str) -> tuple[str, int] | None:
+    for pattern, kind, position in _PERIOD_FORMS:
+        m = pattern.fullmatch(code)
+        if m:
+            return kind, position(m)
+    return None
+
+
+def period_ranges(periods: Mapping[str, str]) -> list[str]:
+    """INE's period labels, in code order, with runs of three or more consecutive periods
+    written as "first to last" (only for code forms whose position is known)."""
+    codes = sorted(periods)
+    out: list[str] = []
+    i = 0
+    while i < len(codes):
+        j = i
+        here = _period_position(codes[i])
+        while here is not None and j + 1 < len(codes):
+            following = _period_position(codes[j + 1])
+            if following is None or following[0] != here[0] or following[1] != here[1] + 1:
+                break
+            j, here = j + 1, following
+        label = [periods[c] or c for c in (codes[i], codes[j])]
+        if j - i >= 2:
+            out.append(f"{label[0]} to {label[1]}")
+        else:
+            out.extend(periods[c] or c for c in codes[i : j + 1])
+        i = j + 1
+    return out
+
+
 def ine_citation(*responses: "DataResponse") -> str:
     """The citation INE's reuse terms require, for every extract that went into a result.
 
@@ -145,11 +186,12 @@ def ine_citation(*responses: "DataResponse") -> str:
         for row in r.data:
             if "period_code" in row:
                 periods.setdefault(str(row["period_code"]), str(row.get("period", "")))
-    labels = [periods[code] or code for code in sorted(periods)]
+    labels = period_ranges(periods)
     date: datetime | None = min(r.extraction_date for r in responses if r.extraction_date)
     assert date is not None
     text = "Source: Statistics Portugal (INE), indicator"
     text += (" " if len(codes) == 1 else "s ") + ", ".join(codes)
     if labels:
-        text += ", reference period" + (" " if len(labels) == 1 else "s ") + ", ".join(labels)
+        several = len(periods) > 1
+        text += ", reference period" + ("s " if several else " ") + ", ".join(labels)
     return f"{text}, extracted {date.date().isoformat()}."

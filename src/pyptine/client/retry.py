@@ -16,6 +16,7 @@ HTTP errors, and refusals.
 """
 
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 #: HTTP statuses retried.
 RETRY_STATUS = frozenset({404, 429, 500, 502, 503, 504})
@@ -31,6 +32,9 @@ MAX_RETRY_AFTER = 120.0
 
 #: Default read timeout, in seconds: longer than INE's 120 s gateway limit.
 DEFAULT_TIMEOUT = 130
+
+#: A parsed JSON body. INE sends a one-element list around an object.
+JSONBody = list[Any] | dict[str, Any]
 
 #: Connect timeout, in seconds (at most the read timeout).
 CONNECT_TIMEOUT = 10.0

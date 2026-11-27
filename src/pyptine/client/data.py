@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, cast
 
+from pyptine.cache.disk import DiskCache
 from pyptine.client import parsing
 from pyptine.client.base import INEClient
 from pyptine.client.metadata import MetadataClient
@@ -43,10 +44,15 @@ class DataClient(INEClient):
         cache_dir: Path | None = None,
         metadata_client: MetadataClient | None = None,
         cache_ttl: int | None = None,
+        cache: DiskCache | None = None,
     ):
-        super().__init__(language, timeout, cache_enabled, cache_dir, cache_ttl=cache_ttl)
+        super().__init__(
+            language, timeout, cache_enabled, cache_dir, cache_ttl=cache_ttl, cache=cache
+        )
         if metadata_client is None:
-            metadata_client = MetadataClient(language, timeout, cache_enabled, cache_dir)
+            metadata_client = MetadataClient(
+                language, timeout, cache_enabled, cache_dir, cache=self.cache
+            )
         elif getattr(metadata_client, "language", self.language) != self.language:
             # Period labels are matched to codes through the metadata, in the same language.
             raise ValueError(

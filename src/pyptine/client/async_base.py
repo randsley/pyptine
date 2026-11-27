@@ -12,6 +12,7 @@ import httpx
 from pyptine.__version__ import __version__
 from pyptine.client import retry
 from pyptine.client.parsing import check_catalogue_body, check_success
+from pyptine.client.retry import JSONBody
 from pyptine.utils.exceptions import APIError, RateLimitError
 
 logger = logging.getLogger(__name__)
@@ -91,7 +92,7 @@ class AsyncINEClient:
         endpoint: str,
         params: dict[str, Any] | None = None,
         response_format: str = "json",
-    ) -> dict[str, Any] | str:
+    ) -> JSONBody | str:
         """Make an async HTTP request to INE API, retrying INE's transient failures.
 
         Raises:
@@ -126,7 +127,7 @@ class AsyncINEClient:
 
     async def _attempt(
         self, url: str, params: dict[str, Any], response_format: str, attempts: int
-    ) -> dict[str, Any] | str:
+    ) -> JSONBody | str:
         """One request. Raises retry.RetryableError for a failure worth repeating."""
         assert self.client is not None
         start_time = time.time()
@@ -160,7 +161,7 @@ class AsyncINEClient:
             check_catalogue_body(response.content, str(params.get("varcd", "")), str(response.url))
         try:
             if response_format == "json":
-                body: dict[str, Any] | str = self._parse_json_response(response)
+                body: JSONBody | str = self._parse_json_response(response)
             else:
                 body = self._parse_xml_response(response)
                 ET.fromstring(body)
@@ -173,14 +174,14 @@ class AsyncINEClient:
             check_success(body, str(params.get("varcd", "")), str(response.url))
         return body
 
-    def _parse_json_response(self, response: httpx.Response) -> dict[str, Any]:
+    def _parse_json_response(self, response: httpx.Response) -> JSONBody:
         """Parse JSON response.
 
         Raises:
             APIError: If JSON parsing fails
         """
         try:
-            data: dict[str, Any] = response.json()
+            data: JSONBody = response.json()
             logger.debug("Parsed JSON response of %d bytes", len(response.content))
             return data
         except ValueError as e:
