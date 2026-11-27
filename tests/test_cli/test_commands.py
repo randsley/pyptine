@@ -27,7 +27,7 @@ class TestSearchCommand:
         result = runner.invoke(cli, ["search", "population"])
 
         assert result.exit_code == 0
-        assert "0004167" in result.output  # Check for indicator code
+        assert "0012276" in result.output  # Census population, in the recorded main group
         assert "Indicators" in result.output  # Check for table title
 
     @responses.activate
@@ -84,12 +84,12 @@ class TestInfoCommand:
     """Tests for info command."""
 
     @responses.activate
-    def test_info_basic(self, sample_catalogue, sample_metadata):
+    def test_info_basic(self, fixtures_dir, sample_metadata):
         """Test basic info command."""
         responses.add(
             responses.GET,
             "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
+            body=(fixtures_dir / "catalogue_opc1_0008273_EN.xml").read_bytes(),
             status=200,
             content_type="application/xml",
         )
@@ -102,19 +102,19 @@ class TestInfoCommand:
         )
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["info", "0004167"])
+        result = runner.invoke(cli, ["info", "0008273"])
 
         assert result.exit_code == 0
         assert "Indicator Information" in result.output
-        assert "0004167" in result.output
+        assert "0008273" in result.output
 
     @responses.activate
-    def test_info_with_language(self, sample_catalogue, sample_metadata):
+    def test_info_with_language(self, fixtures_dir, sample_metadata):
         """Test info command with language option."""
         responses.add(
             responses.GET,
             "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
+            body=(fixtures_dir / "catalogue_opc1_0008273_EN.xml").read_bytes(),
             status=200,
             content_type="application/xml",
         )
@@ -127,7 +127,7 @@ class TestInfoCommand:
         )
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["info", "0004167", "--lang", "PT"])
+        result = runner.invoke(cli, ["info", "0008273", "--lang", "PT"])
 
         assert result.exit_code == 0
 
@@ -156,7 +156,7 @@ class TestDownloadCommand:
         output_file = tmp_path / "test_output.csv"
 
         result = runner.invoke(
-            cli, ["download", "0004167", "--output", str(output_file), "--output-format", "csv"]
+            cli, ["download", "0008273", "--output", str(output_file), "--output-format", "csv"]
         )
 
         assert result.exit_code == 0
@@ -164,8 +164,14 @@ class TestDownloadCommand:
         assert "Data saved" in result.output
 
     @responses.activate
-    def test_download_json(self, sample_data, tmp_path):
+    def test_download_json(self, sample_metadata, sample_data, tmp_path):
         """Test download to JSON."""
+        responses.add(
+            responses.GET,
+            "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp",
+            json=sample_metadata,
+            status=200,
+        )
         responses.add(
             responses.GET,
             "https://www.ine.pt/ine/json_indicador/pindica.jsp",
@@ -177,7 +183,7 @@ class TestDownloadCommand:
         output_file = tmp_path / "test_output.json"
 
         result = runner.invoke(
-            cli, ["download", "0004167", "--output", str(output_file), "--output-format", "json"]
+            cli, ["download", "0008273", "--output", str(output_file), "--output-format", "json"]
         )
 
         assert result.exit_code == 0
@@ -189,8 +195,14 @@ class TestDownloadCommand:
         assert isinstance(data, dict)
 
     @responses.activate
-    def test_download_default_filename(self, sample_data, tmp_path):
+    def test_download_default_filename(self, sample_metadata, sample_data, tmp_path):
         """Test download with default filename."""
+        responses.add(
+            responses.GET,
+            "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp",
+            json=sample_metadata,
+            status=200,
+        )
         responses.add(
             responses.GET,
             "https://www.ine.pt/ine/json_indicador/pindica.jsp",
@@ -201,14 +213,14 @@ class TestDownloadCommand:
         runner = CliRunner()
         # Run in temp directory
         with runner.isolated_filesystem(temp_dir=tmp_path):
-            result = runner.invoke(cli, ["download", "0004167", "--output-format", "csv"])
+            result = runner.invoke(cli, ["download", "0008273", "--output-format", "csv"])
             print(f"CLI result output: {result.output}")
             print(f"CLI result exit_code: {result.exit_code}")
             print(f"Current working directory in test: {Path.cwd()}")
-            print(f"Expected file path: {Path('0004167.csv').absolute()}")
+            print(f"Expected file path: {Path('0008273.csv').absolute()}")
 
             assert result.exit_code == 0
-            assert Path("0004167.csv").exists()
+            assert Path("0008273.csv").exists()
 
     @responses.activate
     def test_download_basic(self, sample_metadata, sample_data, tmp_path):
@@ -234,7 +246,7 @@ class TestDownloadCommand:
             cli,
             [
                 "download",
-                "0004167",
+                "0008273",
                 "--output",
                 str(output_file),
             ],
@@ -258,7 +270,7 @@ class TestDimensionsCommand:
         )
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["dimensions", "0004167"])
+        result = runner.invoke(cli, ["dimensions", "0008273"])
 
         assert result.exit_code == 0
         assert "Dim1" in result.output or "Dimensions" in result.output
@@ -300,8 +312,7 @@ class TestListCommands:
 
         assert result.exit_code == 0
         assert "Indicators" in result.output
-        assert "0004167" in result.output
-        assert "0008074" in result.output
+        assert "0013168" in result.output  # the first entry of the recorded main group
 
     @responses.activate
     def test_list_indicators_with_theme(self, sample_catalogue):
@@ -335,8 +346,8 @@ class TestListCommands:
 
         assert result.exit_code == 0
         assert "Indicators" in result.output
-        assert "0004167" in result.output
-        assert "of 2" in result.output  # Assuming sample_catalogue has 2 indicators
+        assert "0013168" in result.output
+        assert "of 309" in result.output  # the recorded main group (opc=3)
 
 
 class TestCacheCommands:
@@ -413,7 +424,7 @@ class TestExceptionHandling:
         monkeypatch.setattr("pyptine.INE.get_indicator", mock_get_indicator)
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["info", "0004167"])
+        result = runner.invoke(cli, ["info", "0008273"])
 
         assert result.exit_code == 1
         assert "API Error" in result.output or "A test error occurred" in result.output

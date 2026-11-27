@@ -149,6 +149,12 @@ FIXTURES: dict[str, tuple[str, dict[str, str], str]] = {
         {"opc": "1", "varcd": "0008273", "lang": "PT"},
         "the same, Portuguese",
     ),
+    "catalogue_opc3_EN.xml": (
+        CATALOGUE,
+        {"opc": "3", "lang": "EN"},
+        "the main group (309 indicators): stands in for opc=2 in search tests, which is "
+        "21 MB uncompressed; same XML shape, but titles stay Portuguese under EN",
+    ),
     "catalogue_opc1_9999999_EN.xml": (
         CATALOGUE,
         {"opc": "1", "varcd": "9999999", "lang": "EN"},

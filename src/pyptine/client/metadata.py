@@ -149,48 +149,30 @@ class MetadataClient(INEClient):
                     )
 
             if isinstance(response, dict):
-                # Extract basic info - support both old and new API formats
-                # New format uses PascalCase field names
-                varcd = response.get("IndicadorCod") or response.get("indicador", "")
-                title = (
-                    response.get("IndicadorNome")
-                    or response.get("IndicadorDsg")
-                    or response.get("nome", "")
-                )
-                language = response.get("Lingua") or response.get("lang", self.language)
-                unit = response.get("UnidadeMedida") or response.get("unidade")
+                varcd = response.get("IndicadorCod") or ""
+                title = response.get("IndicadorNome") or ""
+                language = response.get("Lingua") or self.language
+                unit = response.get("UnidadeMedida")
                 # pindicaMeta sends no source, notes, description, theme, subtheme,
                 # geographic level or URLs (checked 2026-11-27; the drift check watches
                 # UNSENT_META). Those come from the catalogue: see with_catalogue.
-                periodicity = response.get("Periodic") or response.get("periodicidade")
-                last_period = response.get("UltimoPeriodo") or response.get("ultimoPeriodo")
+                periodicity = response.get("Periodic")
+                last_period = response.get("UltimoPeriodo")
 
-                last_update_str = response.get("DataUltimaAtualizacao") or response.get(
-                    "ultimaActualizacao"
-                )
+                last_update_str = response.get("DataUltimaAtualizacao")
                 last_update = None
                 if last_update_str:
-                    try:
-                        # Try ISO format first (old format)
-                        last_update = datetime.fromisoformat(last_update_str)
+                    try:  # INE sends YYYY-MM-DD
+                        last_update = datetime.strptime(last_update_str, "%Y-%m-%d")
                     except ValueError:
-                        try:
-                            # Try DD-MM-YYYY format (new format)
-                            last_update = datetime.strptime(last_update_str, "%Y-%m-%d")
-                        except ValueError:
-                            logger.warning(f"Could not parse last_update: {last_update_str}")
+                        logger.warning(f"Could not parse last_update: {last_update_str}")
 
-                # Parse dimensions - support both old and new formats
-                dimensions = []
-                if "Dimensoes" in response:
-                    # New API format with complex structure
-                    dimensions = self._parse_dimensions_new_format(response["Dimensoes"])
-                elif "dimensoes" in response:
-                    # Old API format - simple list
-                    dims_data = response["dimensoes"]
-                    for i, dim_data in enumerate(dims_data, start=1):
-                        dimension = self._parse_dimension(dim_data, dimension_id=i)
-                        dimensions.append(dimension)
+                if not isinstance(response.get("Dimensoes"), dict):
+                    raise DataProcessingError(
+                        f"INE's metadata for {varcd or 'the indicator'} has no Dimensoes "
+                        f"object (keys: {sorted(response)})"
+                    )
+                dimensions = self._parse_dimensions(response["Dimensoes"])
 
                 return IndicatorMetadata(
                     varcd=varcd,
@@ -212,39 +194,10 @@ class MetadataClient(INEClient):
             logger.error(f"Failed to parse metadata response: {str(e)}")
             raise DataProcessingError(f"Failed to parse metadata: {str(e)}") from e
 
-    def _parse_dimension(self, dim_data: dict[str, Any], dimension_id: int) -> Dimension:
-        """Parse a single dimension from API response (old format).
+    def _parse_dimensions(self, dims_data: dict[str, Any]) -> list[Dimension]:
+        """Parse INE's ``Dimensoes`` object.
 
-        Args:
-            dim_data: Dimension data from API
-            dimension_id: Dimension identifier
-
-        Returns:
-            Parsed Dimension object
-        """
-        # Get dimension info
-        dim_id = dim_data.get("id", dimension_id)
-        name = dim_data.get("nome", f"Dimension {dim_id}")
-        description = dim_data.get("descricao")
-
-        # Parse dimension values
-        values = []
-        values_data = dim_data.get("valores", [])
-
-        for val_data in values_data:
-            value = DimensionValue(
-                code=val_data.get("codigo", ""),
-                label=val_data.get("label", ""),
-                order=val_data.get("ordem"),
-            )
-            values.append(value)
-
-        return Dimension(id=dim_id, name=name, description=description, values=values)
-
-    def _parse_dimensions_new_format(self, dims_data: dict[str, Any]) -> list[Dimension]:
-        """Parse dimensions from new API format.
-
-        New format structure:
+        Structure:
         {
             "Descricao_Dim": [
                 {"dim_num": "1", "abrv": "Name", ...},
@@ -257,7 +210,7 @@ class MetadataClient(INEClient):
         }
 
         Args:
-            dims_data: Dimensions data from new API format
+            dims_data: INE's ``Dimensoes``
 
         Returns:
             List of parsed Dimension objects

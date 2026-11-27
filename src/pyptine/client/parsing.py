@@ -258,8 +258,6 @@ def parse_data_response(
             metadata does not list, or no ``DataExtracao``
     """
     check_success(response, varcd)
-    varcd_val, title, unit = varcd, "", None
-    lang = language
     rows: list[dict[str, Any]] = []
     metadata: Optional[IndicatorMetadata] = None
     extracted = None
@@ -275,75 +273,55 @@ def parse_data_response(
 
     try:
         if isinstance(response, list):
-            if len(response) == 1 and isinstance(response[0], dict):
-                response = response[0]
-            else:
-                # A bare list of rows (an older format; never served by INE since at least
-                # 2026-11-27, kept for compatibility).
-                rows = [process_data_point(p) for p in response]
-                response = {}
-
+            if len(response) != 1 or not isinstance(response[0], dict):
+                raise DataProcessingError(
+                    f"Unexpected data response for {varcd}: a list of {len(response)} "
+                    "items (INE sends one object inside a list)"
+                )
+            response = response[0]
         if not isinstance(response, dict):
             raise DataProcessingError(f"Unexpected data response for {varcd}: {type(response)}")
 
-        if response:
-            varcd_val = response.get("IndicadorCod") or response.get("indicador", varcd)
-            title = (
-                response.get("IndicadorDsg")
-                or response.get("IndicadorNome")
-                or response.get("nome", "")
+        dados = response.get("Dados")
+        if not isinstance(dados, dict):
+            raise DataProcessingError(
+                f"INE's data response for {varcd} has no Dados object "
+                f"(got {type(dados).__name__}; keys: {sorted(response)})"
             )
-            lang = response.get("Lingua") or response.get("lang", language)
-            unit = response.get("UnidadeMedida") or response.get("unidade")
-            dados = response.get("Dados")
-            if dados is None:
-                dados = response.get("dados")
-            if isinstance(dados, dict):
-                # INE's format: provenance is required, so a missing timestamp is refused.
-                extracted = parse_extraction_date(response.get("DataExtracao"), varcd)
-                last_updated = response.get("DataUltimoAtualizacao")
-                metadata_url = response.get("MetaInfUrl")
-                md = meta()
-                if md is None:
-                    raise DataProcessingError(
-                        f"Period codes for {varcd} need its metadata, which is not available"
-                    )
-                lookup = _period_lookup(md)
-                geo = [d for d in md.dimensions if d.id == 2]
-                if geo:  # Dim2 is geography; its full code list tells NUTS from districts
-                    geo_classification = classify_geography(v.code for v in geo[0].values)
-                for label, period_rows in dados.items():
-                    code = lookup.get(label)
-                    if code is None:
-                        raise DataProcessingError(
-                            f"INE keyed data for {varcd} by period {label!r}, which the "
-                            f"indicator's metadata ({md.language}) does not list; cannot "
-                            "assign its period code"
-                        )
-                    for row in period_rows:
-                        rows.append(
-                            {"period": label, "period_code": code, **process_data_point(row)}
-                        )
-            elif isinstance(dados, list):
-                # Older flat format (see above).
-                rows = [process_data_point(p) for p in dados]
-            elif dados is not None:
-                raise DataProcessingError(f"Unexpected Dados for {varcd}: {type(dados)}")
+        varcd_val = response.get("IndicadorCod") or varcd
+        title = response.get("IndicadorDsg") or ""
+        lang = language  # the data response has no Lingua: the request language
+        # Provenance is required, so a missing timestamp is refused.
+        extracted = parse_extraction_date(response.get("DataExtracao"), varcd)
+        last_updated = response.get("DataUltimoAtualizacao")
+        metadata_url = response.get("MetaInfUrl")
+        md = meta()
+        if md is None:
+            raise DataProcessingError(
+                f"Period codes for {varcd} need its metadata, which is not available"
+            )
+        lookup = _period_lookup(md)
+        geo = [d for d in md.dimensions if d.id == 2]
+        if geo:  # Dim2 is geography; its full code list tells NUTS from districts
+            geo_classification = classify_geography(v.code for v in geo[0].values)
+        for label, period_rows in dados.items():
+            code = lookup.get(label)
+            if code is None:
+                raise DataProcessingError(
+                    f"INE keyed data for {varcd} by period {label!r}, which the "
+                    f"indicator's metadata ({md.language}) does not list; cannot "
+                    "assign its period code"
+                )
+            for row in period_rows:
+                rows.append({"period": label, "period_code": code, **process_data_point(row)})
     except (DataProcessingError, INERefusalError):
         raise
     except Exception as e:
         raise DataProcessingError(f"Failed to parse data for {varcd}: {e}") from e
 
-    # The data response carries no unit; the metadata does.
-    if unit is None or not title:
-        try:
-            md = meta()
-        except Exception as e:  # metadata is a fallback here, not required
-            logger.debug(f"Could not fetch metadata for {varcd}: {e}")
-            md = None
-        if md is not None:
-            unit = unit if unit is not None else md.unit
-            title = title or md.title
+    # The data response carries no unit; the metadata (already fetched) does.
+    unit = md.unit
+    title = title or md.title
 
     return DataResponse(
         varcd=varcd_val,

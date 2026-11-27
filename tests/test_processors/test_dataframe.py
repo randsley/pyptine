@@ -1,8 +1,14 @@
-"""Tests for DataFrame processing utilities."""
+"""Tests for the DataFrame helpers, on INE's recorded responses (tests/fixtures/ine/)."""
+
+import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
+from pyptine.client.metadata import MetadataClient
+from pyptine.client.parsing import parse_data_response
+from pyptine.models.response import DataResponse
 from pyptine.processors.dataframe import (
     aggregate_by_period,
     clean_dataframe,
@@ -14,248 +20,164 @@ from pyptine.processors.dataframe import (
 )
 from pyptine.utils.exceptions import DataProcessingError
 
+FIXTURES = Path(__file__).parents[1] / "fixtures" / "ine"
+
+
+def load(name: str):
+    return json.loads((FIXTURES / name).read_bytes())
+
+
+def metadata(varcd: str):
+    return MetadataClient(cache_enabled=False)._parse_metadata_response(
+        load(f"meta_{varcd}_EN.json")
+    )
+
+
+def recorded(varcd: str, data: str) -> DataResponse:
+    md = metadata(varcd)
+    return parse_data_response(varcd, load(data), "EN", lambda: md)
+
+
+@pytest.fixture
+def years() -> DataResponse:
+    """0008273, Portugal, both sexes, all ages, 2021 and 2022."""
+    return recorded("0008273", "data_0008273_S7A2021_S7A2022_EN.json")
+
+
+@pytest.fixture
+def districts() -> DataResponse:
+    """0004167, 2025, both sexes, all ages: Portugal, 3 NUTS I regions, 18 districts."""
+    return recorded("0004167", "data_0004167_S7A2025_EN.json")
+
 
 class TestJsonToDataFrame:
-    """Tests for json_to_dataframe function."""
-
-    def test_convert_list_of_dicts(self):
-        """Test converting list of dicts to DataFrame."""
-        data = [
-            {"periodo": "2023", "geocod": "1", "valor": "10639726"},
-            {"periodo": "2022", "geocod": "1", "valor": "10467366"},
-        ]
-
-        df = json_to_dataframe(data)
-
-        assert isinstance(df, pd.DataFrame)
-        assert len(df) == 2
-        assert "valor" in df.columns or "value" in df.columns
-
-    def test_convert_dict_with_dados_key(self):
-        """Test converting dict with 'dados' key."""
-        data = {
-            "indicador": "0004167",
-            "dados": [
-                {"periodo": "2023", "valor": "100"},
-                {"periodo": "2022", "valor": "200"},
-            ],
-        }
-
-        df = json_to_dataframe(data)
+    def test_rows(self, years):
+        df = json_to_dataframe(years.data)
 
         assert len(df) == 2
+        # Names stay as INE and the parser give them (no underscores replaced).
+        assert {"period", "period_code", "dim_3", "dim_3_t", "value"} <= set(df.columns)
+        assert pd.api.types.is_numeric_dtype(df["value"])
+        assert list(df["period_code"]) == ["S7A2021", "S7A2022"]  # not parsed as dates
 
-    def test_empty_data(self):
-        """Test handling empty data."""
-        df = json_to_dataframe([])
+    def test_raw_rows_value_numeric(self):
+        rows = load("data_0008273_S7A2021_S7A2022_EN.json")[0]["Dados"]["2021"]
+        df = json_to_dataframe(rows)
+        assert df["valor"].iloc[0] == 10599117  # INE's valor is a string
 
-        assert isinstance(df, pd.DataFrame)
-        assert df.empty
+    def test_quarter_labels_kept(self):
+        """INE's labels ("1st Quarter 2026") are not dates: kept, never turned into NaT."""
+        labels = [v.label for v in metadata("0012234").dimensions[0].values][:3]
+        df = json_to_dataframe([{"period": label, "value": 1.0} for label in labels])
+        assert list(df["period"]) == labels
 
-    def test_value_conversion_to_numeric(self):
-        """Test that valor/value columns are converted to numeric."""
-        data = [
-            {"periodo": "2023", "valor": "100.5"},
-            {"periodo": "2022", "valor": "200.7"},
-        ]
+    def test_response_object_refused(self):
+        with pytest.raises(DataProcessingError, match="list of rows"):
+            json_to_dataframe(load("data_0008273_S7A2021_S7A2022_EN.json")[0])
 
-        df = json_to_dataframe(data)
-
-        # Find the value column
-        value_col = next((col for col in df.columns if "valor" in col.lower()), None)
-        if value_col:
-            assert pd.api.types.is_numeric_dtype(df[value_col])
+    def test_empty(self):
+        assert json_to_dataframe([]).empty
 
 
 class TestPivotByDimension:
-    """Tests for pivot_by_dimension function."""
+    def test_pivot(self, districts):
+        df = districts.to_dataframe()[["period_code", "geocod", "value"]]
 
-    def test_basic_pivot(self):
-        """Test basic pivot operation."""
+        pivoted = pivot_by_dimension(df, "geocod")
+
+        assert pivoted.loc["S7A2025", ("value", "11")] == 2655832  # Lisboa district
+        assert pivoted.loc["S7A2025", ("value", "PT")] == 11424031
+
+    def test_list_value_column(self, districts):
+        df = districts.to_dataframe()[["period_code", "geocod", "value"]]
+        df["double"] = df["value"] * 2
+
+        pivoted = pivot_by_dimension(df, "geocod", value_column=["value", "double"])
+
+        assert pivoted.loc["S7A2025", ("double", "PT")] == 2 * 11424031
+
+
+class TestAggregateByPeriod:
+    def test_sum_over_one_level(self, districts):
+        """Sum one level only: the 18 districts add up to the mainland (NUTS I "1")."""
+        df = districts.at_level("district").to_dataframe()
+
+        agg = aggregate_by_period(df)
+
+        assert list(agg.columns) == ["period_code", "value"]
+        assert agg["value"].iloc[0] == 10912573
+
+    def test_list_value_column(self, years):
+        df = years.to_dataframe()
+        df["double"] = df["value"] * 2
+
+        agg = aggregate_by_period(df, value_column=["value", "double"])
+
+        assert list(agg["double"]) == [2 * 10599117, 2 * 10929704]
+
+    def test_missing_column(self):
+        with pytest.raises(DataProcessingError, match="Period column"):
+            aggregate_by_period(pd.DataFrame({"data": [1, 2, 3]}))
+
+
+class TestGetLatestPeriod:
+    def test_latest(self, years):
+        latest = get_latest_period(years.to_dataframe())
+        assert list(latest["period_code"]) == ["S7A2022"]
+
+    def test_codes_sort_where_labels_do_not(self):
+        """Quarterly labels sort wrongly ("4th Quarter 2019" after "1st Quarter 2026");
+        the default column, period_code, sorts chronologically."""
+        values = metadata("0012234").dimensions[0].values
         df = pd.DataFrame(
-            {
-                "periodo": ["2023", "2023", "2022"],
-                "region": ["North", "South", "North"],
-                "valor": [100, 200, 150],
-            }
+            {"period": [v.label for v in values], "period_code": [v.code for v in values]}
         )
+        assert get_latest_period(df)["period_code"].iloc[0] == values[-1].code
+        assert get_latest_period(df, period_column="period")["period"].iloc[0] != values[-1].label
 
-        pivoted = pivot_by_dimension(df, "region")
+    def test_n(self, years):
+        latest = get_latest_period(years.to_dataframe(), n=2)
+        assert set(latest["period_code"]) == {"S7A2021", "S7A2022"}
 
-        assert isinstance(pivoted, pd.DataFrame)
-        assert ("valor", "North") in pivoted.columns
-        assert ("valor", "South") in pivoted.columns
-        assert pivoted.loc["2023", ("valor", "North")] == 100
-        assert pivoted.loc["2023", ("valor", "South")] == 200
-        assert pivoted.loc["2022", ("valor", "North")] == 150
+    def test_missing_column(self):
+        with pytest.raises(ValueError, match="Period column"):
+            get_latest_period(pd.DataFrame({"data": [1, 2, 3]}))
 
-    def test_pivot_by_dimension_list_value_column(self):
-        """Test pivot operation with value_column as a list."""
-        df = pd.DataFrame(
-            {
-                "periodo": ["2023", "2023", "2022"],
-                "region": ["North", "South", "North"],
-                "valor1": [100, 200, 150],
-                "valor2": [10, 20, 15],
-            }
-        )
 
-        pivoted = pivot_by_dimension(df, "region", value_column=["valor1", "valor2"])
+class TestFilterByGeography:
+    def test_by_name(self, districts):
+        filtered = filter_by_geography(districts.to_dataframe(), "Lisboa")
+        assert list(filtered["geocod"]) == ["11"]
 
-        assert ("valor1", "North") in pivoted.columns
-        assert ("valor2", "South") in pivoted.columns
-        assert len(pivoted) > 0
+    def test_case_insensitive(self, districts):
+        assert len(filter_by_geography(districts.to_dataframe(), "LISBOA")) == 1
 
 
 class TestCleanDataFrame:
-    """Tests for clean_dataframe function."""
-
-    def test_drop_internal_columns(self):
-        """Test dropping columns starting with underscore."""
-        df = pd.DataFrame({"_internal": [1, 2, 3], "data": [4, 5, 6], "_meta": [7, 8, 9]})
+    def test_drop_internal_columns(self, years):
+        df = years.to_dataframe()
+        df["_internal"] = 1
 
         cleaned = clean_dataframe(df)
 
         assert "_internal" not in cleaned.columns
-        assert "_meta" not in cleaned.columns
-        assert "data" in cleaned.columns
+        assert "period_code" in cleaned.columns
 
-    def test_rename_columns(self):
-        """Test renaming columns."""
-        df = pd.DataFrame({"old_name": [1, 2, 3], "data": [4, 5, 6]})
-
+    def test_rename_columns(self, years):
         renamed = clean_dataframe(
-            df, drop_internal_columns=False, rename_columns={"old_name": "new_name"}
+            years.to_dataframe(), drop_internal_columns=False, rename_columns={"geodsg": "place"}
         )
-
-        assert "new_name" in renamed.columns
-        assert "old_name" not in renamed.columns
+        assert "place" in renamed.columns and "geodsg" not in renamed.columns
 
 
 class TestMergeMetadata:
-    """Tests for merge_metadata function."""
+    def test_add_metadata_columns(self, years):
+        result = merge_metadata(
+            years.to_dataframe(), {"indicator": years.varcd, "unit": years.unit}
+        )
+        assert all(result["meta_indicator"] == "0008273")
+        assert all(result["meta_unit"] == "Number (No.)")
 
-    def test_add_metadata_columns(self):
-        """Test adding metadata as columns."""
-        df = pd.DataFrame({"value": [1, 2, 3]})
-        metadata = {"indicator": "0004167", "unit": "No."}
-
-        result = merge_metadata(df, metadata)
-
-        assert "meta_indicator" in result.columns
-        assert "meta_unit" in result.columns
-        assert all(result["meta_indicator"] == "0004167")
-
-    def test_custom_prefix(self):
-        """Test custom prefix for metadata columns."""
-        df = pd.DataFrame({"value": [1, 2, 3]})
-        metadata = {"source": "INE"}
-
-        result = merge_metadata(df, metadata, prefix="info_")
-
+    def test_custom_prefix(self, years):
+        result = merge_metadata(years.to_dataframe(), {"source": "INE"}, prefix="info_")
         assert "info_source" in result.columns
-
-
-class TestAggregateByPeriod:
-    """Tests for aggregate_by_period function."""
-
-    def test_sum_aggregation(self):
-        """Test sum aggregation by period."""
-        df = pd.DataFrame(
-            {
-                "periodo": ["2023", "2023", "2022"],
-                "region": ["A", "B", "A"],
-                "valor": [100, 200, 150],
-            }
-        )
-
-        agg = aggregate_by_period(df)
-
-        assert len(agg) == 2  # Two unique periods
-        assert "periodo" in agg.columns
-        assert "valor" in agg.columns
-
-    def test_missing_column_error(self):
-        """Test error when period column missing."""
-        df = pd.DataFrame({"data": [1, 2, 3]})
-
-        with pytest.raises(DataProcessingError, match="Period column"):
-            aggregate_by_period(df)
-
-    def test_aggregate_by_period_list_value_column(self):
-        """Test aggregation with value_column as a list."""
-        df = pd.DataFrame(
-            {
-                "periodo": ["2023", "2023", "2022"],
-                "valor1": [100, 200, 150],
-                "valor2": [10, 20, 15],
-            }
-        )
-
-        agg = aggregate_by_period(df, value_column=["valor1", "valor2"])
-
-        assert len(agg) == 2
-        assert "valor1" in agg.columns
-        assert "valor2" in agg.columns
-        assert agg["valor1"].iloc[1] == 300  # 100 + 200
-        assert agg["valor2"].iloc[1] == 30  # 10 + 20
-
-
-class TestFilterByGeography:
-    """Tests for filter_by_geography function."""
-
-    def test_filter_by_geography(self):
-        """Test filtering by geographic region."""
-        df = pd.DataFrame({"geodsg": ["Portugal", "Lisboa", "Porto"], "valor": [100, 50, 30]})
-
-        filtered = filter_by_geography(df, "Portugal")
-
-        assert len(filtered) == 1
-        assert filtered["geodsg"].iloc[0] == "Portugal"
-
-    def test_auto_detect_geography_column(self):
-        """Test auto-detection of geography column."""
-        df = pd.DataFrame({"region": ["North", "South", "East"], "valor": [1, 2, 3]})
-
-        filtered = filter_by_geography(df, "North")
-
-        assert len(filtered) == 1
-
-    def test_case_insensitive_filter(self):
-        """Test case-insensitive filtering."""
-        df = pd.DataFrame({"geodsg": ["PORTUGAL", "lisboa", "PoRtO"], "valor": [100, 50, 30]})
-
-        filtered = filter_by_geography(df, "portugal")
-
-        assert len(filtered) == 1
-
-
-class TestGetLatestPeriod:
-    """Tests for get_latest_period function."""
-
-    def test_get_single_latest_period(self):
-        """Test getting the latest period."""
-        df = pd.DataFrame(
-            {"periodo": ["2021", "2022", "2023", "2022"], "valor": [100, 150, 200, 160]}
-        )
-
-        latest = get_latest_period(df)
-
-        assert all(latest["periodo"] == "2023")
-
-    def test_get_multiple_latest_periods(self):
-        """Test getting multiple latest periods."""
-        df = pd.DataFrame({"periodo": ["2021", "2022", "2023"], "valor": [100, 150, 200]})
-
-        latest = get_latest_period(df, n=2)
-
-        unique_periods = latest["periodo"].unique()
-        assert len(unique_periods) <= 2
-        assert "2023" in unique_periods
-
-    def test_missing_period_column(self):
-        """Test error when period column missing."""
-        df = pd.DataFrame({"data": [1, 2, 3]})
-
-        with pytest.raises(ValueError, match="Period column"):
-            get_latest_period(df)

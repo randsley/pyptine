@@ -32,115 +32,28 @@ def no_retry_waits(monkeypatch):
 
 @pytest.fixture
 def fixtures_dir() -> Path:
-    """Return path to fixtures directory."""
-    return Path(__file__).parent / "fixtures"
+    """INE's recorded responses (see tests/fixtures/ine/PROVENANCE.json)."""
+    return Path(__file__).parent / "fixtures" / "ine"
 
 
 @pytest.fixture
-def sample_metadata(fixtures_dir: Path) -> dict[str, Any]:
-    """Load sample metadata response."""
-    fixture_path = fixtures_dir / "metadata_response.json"
-    if fixture_path.exists():
-        with open(fixture_path) as f:
-            return json.load(f)
-
-    # Return minimal sample if fixture doesn't exist yet
-    return {
-        "indicador": "0004167",
-        "nome": "Resident population",
-        "lang": "EN",
-        "dimensoes": [
-            {
-                "id": 1,
-                "nome": "Period",
-                "valores": [
-                    {"codigo": "2020", "label": "2020"},
-                    {"codigo": "2021", "label": "2021"},
-                ],
-            }
-        ],
-    }
+def sample_metadata(fixtures_dir: Path) -> list[dict[str, Any]]:
+    """INE's metadata for 0008273 (resident population, NUTS 2013), EN, as recorded."""
+    return json.loads((fixtures_dir / "meta_0008273_EN.json").read_bytes())
 
 
 @pytest.fixture
-def sample_data(fixtures_dir: Path) -> dict[str, Any]:
-    """Load sample data response."""
-    fixture_path = fixtures_dir / "data_response.json"
-    if fixture_path.exists():
-        with open(fixture_path) as f:
-            return json.load(f)
-
-    # Return minimal sample if fixture doesn't exist yet
-    return {
-        "indicador": "0004167",
-        "nome": "Resident population",
-        "lang": "EN",
-        "dados": [
-            {"periodo": "2020", "geo": "Portugal", "valor": "10298252"},
-            {"periodo": "2021", "geo": "Portugal", "valor": "10295909"},
-        ],
-    }
+def sample_data(fixtures_dir: Path) -> list[dict[str, Any]]:
+    """INE's data for 0008273, 2021 and 2022, Portugal, both sexes, all ages, EN, as recorded
+    (query: Dim1=S7A2021,S7A2022 Dim2=PT Dim3=T Dim4=T)."""
+    return json.loads((fixtures_dir / "data_0008273_S7A2021_S7A2022_EN.json").read_bytes())
 
 
 @pytest.fixture
 def sample_catalogue(fixtures_dir: Path) -> str:
-    """Load sample catalogue XML response."""
-    fixture_path = fixtures_dir / "catalogue_response.xml"
-    if fixture_path.exists():
-        with open(fixture_path) as f:
-            return f.read()
-
-    # Return minimal sample if fixture doesn't exist yet
-    return """<?xml version="1.0" encoding="UTF-8"?>
-<catalog>
-    <indicator id="0004167">
-        <theme>Population</theme>
-        <subtheme>Demographic estimates</subtheme>
-        <keywords>INE,population,residents,demographics</keywords>
-        <title>Resident population</title>
-        <varcd>0004167</varcd>
-        <description>Resident population (No.) by Place of residence (NUTS - 2013); Annual</description>
-        <geo_lastlevel>Municipality</geo_lastlevel>
-        <source>INE, Population estimates</source>
-        <dates>
-            <last_period_available>2023</last_period_available>
-            <last_update>14-06-2024</last_update>
-        </dates>
-        <periodicity>Annual</periodicity>
-        <html>
-            <bdd_url>https://www.ine.pt/xurl/indx/0004167/EN</bdd_url>
-            <metainfo_url>https://www.ine.pt/xurl/metax/0004167/EN</metainfo_url>
-        </html>
-        <json>
-            <json_dataset>https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&amp;varcd=0004167&amp;lang=EN</json_dataset>
-            <json_metainfo>https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=0004167&amp;lang=EN</json_metainfo>
-        </json>
-    </indicator>
-    <indicator id="0008074">
-        <theme>Population</theme>
-        <subtheme>Demographic estimates</subtheme>
-        <keywords>INE,population,sex,age</keywords>
-        <title>Resident population by sex and age group</title>
-        <varcd>0008074</varcd>
-        <description>Resident population by sex and age group; Annual</description>
-        <geo_lastlevel>National</geo_lastlevel>
-        <source>INE, Population estimates</source>
-        <dates>
-            <last_period_available>2023</last_period_available>
-            <last_update>14-06-2024</last_update>
-        </dates>
-        <periodicity>Annual</periodicity>
-        <html>
-            <bdd_url>https://www.ine.pt/xurl/indx/0008074/EN</bdd_url>
-            <metainfo_url>https://www.ine.pt/xurl/metax/0008074/EN</metainfo_url>
-        </html>
-        <json>
-            <json_dataset>https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&amp;varcd=0008074&amp;lang=EN</json_dataset>
-            <json_metainfo>https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=0008074&amp;lang=EN</json_metainfo>
-        </json>
-    </indicator>
-</catalog>
-"""
+    """INE's catalogue main group (opc=3, 309 indicators), EN, as recorded. It stands in for
+    the whole catalogue (opc=2, 21 MB), which has the same XML shape; titles are Portuguese."""
+    return (fixtures_dir / "catalogue_opc3_EN.xml").read_text(encoding="utf-8")
 
 
 @pytest.fixture
@@ -149,13 +62,3 @@ def temp_cache_dir(tmp_path: Path) -> Path:
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir(exist_ok=True)
     return cache_dir
-
-
-@pytest.fixture
-def mock_ine_client():
-    """Create a mock INE client for testing."""
-    from pyine.client.base import INEClient
-
-    client = INEClient(language="EN", cache_enabled=False)
-    yield client
-    client.close()

@@ -1,4 +1,7 @@
-"""Tests for CatalogueClient."""
+"""Tests for CatalogueClient, against INE's recorded responses (tests/fixtures/ine/)."""
+
+import re
+from datetime import datetime
 
 import pytest
 import responses
@@ -7,116 +10,85 @@ from pyptine.client.catalogue import CatalogueClient
 from pyptine.models.indicator import Indicator
 from pyptine.utils.exceptions import APIError, DataProcessingError
 
+CATALOGUE_URL = "https://www.ine.pt/ine/xml_indic.jsp"
+
 
 @pytest.fixture
 def catalogue_client():
-    """Create CatalogueClient instance."""
     return CatalogueClient(language="EN", cache_enabled=False)
 
 
+@pytest.fixture
+def catalogue_entry(fixtures_dir) -> str:
+    """INE's opc=1 answer for 0008273, EN, as recorded."""
+    return (fixtures_dir / "catalogue_opc1_0008273_EN.xml").read_text(encoding="utf-8")
+
+
 class TestCatalogueClient:
-    """Tests for CatalogueClient."""
-
     @responses.activate
-    def test_get_indicator_success(self, catalogue_client, sample_catalogue):
-        """Test successful single indicator retrieval."""
-        responses.add(
-            responses.GET,
-            "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
-            status=200,
-            content_type="text/xml",
-        )
+    def test_get_indicator_success(self, catalogue_client, catalogue_entry):
+        responses.add(responses.GET, CATALOGUE_URL, body=catalogue_entry, status=200)
 
-        indicator = catalogue_client.get_indicator("0004167")
+        indicator = catalogue_client.get_indicator("0008273")
 
         assert isinstance(indicator, Indicator)
-        assert indicator.varcd == "0004167"
-        assert indicator.title is not None
-        assert indicator.theme is not None
+        assert indicator.varcd == "0008273"
+        assert indicator.title == "Resident population (No.)"
 
     @responses.activate
-    def test_get_indicator_verifies_params(self, catalogue_client, sample_catalogue):
-        """Test that get_indicator sends correct parameters."""
-        responses.add(
-            responses.GET,
-            "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
-            status=200,
-        )
+    def test_get_indicator_verifies_params(self, catalogue_client, catalogue_entry):
+        responses.add(responses.GET, CATALOGUE_URL, body=catalogue_entry, status=200)
 
-        catalogue_client.get_indicator("0004167")
+        catalogue_client.get_indicator("0008273")
 
-        # Verify request parameters
-        assert len(responses.calls) == 1
-        request_url = responses.calls[0].request.url
-        assert "opc=1" in request_url  # Single indicator
-        assert "varcd=0004167" in request_url
-        assert "lang=EN" in request_url
+        url = responses.calls[0].request.url
+        assert "opc=1" in url
+        assert "varcd=0008273" in url
+
+    @responses.activate
+    def test_get_indicator_refuses_other_entries(self, catalogue_client, sample_catalogue):
+        """An answer that is not the one entry asked for is refused, not its first entry."""
+        responses.add(responses.GET, CATALOGUE_URL, body=sample_catalogue, status=200)
+
+        with pytest.raises(DataProcessingError, match="309 entries"):
+            catalogue_client.get_indicator("0012234")
 
     @responses.activate
     def test_get_main_indicators(self, catalogue_client, sample_catalogue):
-        """Test retrieving main indicators group."""
-        responses.add(
-            responses.GET,
-            "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
-            status=200,
-        )
+        responses.add(responses.GET, CATALOGUE_URL, body=sample_catalogue, status=200)
 
         indicators = catalogue_client.get_main_indicators()
 
-        assert isinstance(indicators, list)
-        assert len(indicators) == 2  # Sample fixture has 2 indicators
+        assert len(indicators) == 309
         assert all(isinstance(ind, Indicator) for ind in indicators)
-
-    @responses.activate
-    def test_get_main_indicators_verifies_params(self, catalogue_client, sample_catalogue):
-        """Test that get_main_indicators sends correct parameters."""
-        responses.add(
-            responses.GET,
-            "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
-            status=200,
-        )
-
-        catalogue_client.get_main_indicators()
-
-        # Verify request parameters
-        request_url = responses.calls[0].request.url
-        assert "opc=3" in request_url  # Main indicators group
+        assert "opc=3" in responses.calls[0].request.url
 
     def test_get_catalogue_response_refuses_missing_date(self, catalogue_client, sample_catalogue):
-        """The hand-written catalogue has no <extraction_date>; INE always sends one."""
+        """INE always sends <extraction_date>; a body without one is refused."""
+        body = re.sub(r"<extraction_date>.*?</extraction_date>", "", sample_catalogue, count=1)
         with responses.RequestsMock() as rsps:
-            rsps.add(responses.GET, "https://www.ine.pt/ine/xml_indic.jsp", body=sample_catalogue)
+            rsps.add(responses.GET, CATALOGUE_URL, body=body)
             with pytest.raises(DataProcessingError, match="no <extraction_date>"):
                 catalogue_client.get_catalogue_response()
             assert "opc=3" in rsps.calls[0].request.url
 
     @responses.activate
-    def test_parse_indicator_fields(self, catalogue_client, sample_catalogue):
-        """Test parsing of all indicator fields from XML."""
-        responses.add(
-            responses.GET,
-            "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
-            status=200,
-        )
+    def test_parse_indicator_fields(self, catalogue_client, catalogue_entry):
+        responses.add(responses.GET, CATALOGUE_URL, body=catalogue_entry, status=200)
 
-        indicator = catalogue_client.get_indicator("0004167")
+        indicator = catalogue_client.get_indicator("0008273")
 
-        # Check all expected fields
-        assert indicator.varcd == "0004167"
-        assert indicator.title is not None
         assert indicator.theme == "Population"
-        assert indicator.subtheme == "Demographic estimates"
+        assert indicator.subtheme == "Population estimates"
         assert indicator.periodicity == "Annual"
-        assert indicator.last_period == "2023"
-        assert indicator.geo_last_level == "Municipality"
-        assert indicator.html_url is not None
-        assert indicator.metadata_url is not None
-        assert indicator.data_url is not None
+        assert indicator.last_period == "S7A2023"
+        assert indicator.last_update == datetime(2026, 7, 17)  # INE sends DD-MM-YYYY
+        # Localised for some indicators only, even under EN (see CLAUDE.md quirks).
+        assert indicator.geo_last_level == "Município"
+        assert indicator.html_url == "https://www.ine.pt/xurl/indx/0008273"
+        assert indicator.metadata_url.endswith("pindicaMeta.jsp?varcd=0008273&lang=EN")
+        assert indicator.data_url.endswith("pindica.jsp?op=2&varcd=0008273&lang=EN")
+        assert indicator.source == "Statistics Portugal, Annual estimates of resident population"
 
     @responses.activate
     def test_invalid_xml(self, catalogue_client):
@@ -132,7 +104,7 @@ class TestCatalogueClient:
 
         # A malformed body is retried, then reported as an API error.
         with pytest.raises(APIError, match="Invalid XML"):
-            catalogue_client.get_indicator("0004167")
+            catalogue_client.get_indicator("0008273")
 
     @responses.activate
     def test_empty_xml_response(self, catalogue_client):
@@ -153,7 +125,7 @@ class TestCatalogueClient:
         )
 
         with pytest.raises(DataProcessingError, match="not found in catalogue"):
-            catalogue_client.get_indicator("0004167")
+            catalogue_client.get_indicator("0008273")
 
     @responses.activate
     def test_api_error_handling(self, catalogue_client):
@@ -165,33 +137,4 @@ class TestCatalogueClient:
         )
 
         with pytest.raises(APIError):
-            catalogue_client.get_indicator("0004167")
-
-    @responses.activate
-    def test_datetime_parsing(self, catalogue_client):
-        """Test parsing of last_update datetime field."""
-        xml_with_date = """<?xml version="1.0" encoding="UTF-8"?>
-        <catalog>
-            <indicator id="0004167">
-                <varcd>0004167</varcd>
-                <title>Test Indicator</title>
-                <dates>
-                    <last_update>14-06-2024</last_update>
-                </dates>
-            </indicator>
-        </catalog>
-        """
-
-        responses.add(
-            responses.GET,
-            "https://www.ine.pt/ine/xml_indic.jsp",
-            body=xml_with_date,
-            status=200,
-        )
-
-        indicator = catalogue_client.get_indicator("0004167")
-
-        assert indicator.last_update is not None
-        assert indicator.last_update.year == 2024
-        assert indicator.last_update.month == 6
-        assert indicator.last_update.day == 14
+            catalogue_client.get_indicator("0008273")

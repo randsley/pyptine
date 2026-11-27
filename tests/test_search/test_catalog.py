@@ -8,6 +8,12 @@ from pyptine.models.indicator import Indicator
 from pyptine.search.catalog import CatalogueBrowser
 
 
+@pytest.fixture
+def catalogue_entry(fixtures_dir) -> str:
+    """INE's opc=1 answer for 0008273, EN, as recorded."""
+    return (fixtures_dir / "catalogue_opc1_0008273_EN.xml").read_text(encoding="utf-8")
+
+
 class TestCatalogueBrowser:
     """Tests for CatalogueBrowser class."""
 
@@ -46,7 +52,8 @@ class TestCatalogueBrowser:
 
         results = browser.search("population")
 
-        assert len(results) > 0
+        # 0008273's keywords carry its theme "Population" (opc=3, recorded 2026-11-27).
+        assert len(results) == 22
         assert all(isinstance(ind, Indicator) for ind in results)
 
         # Check that results match search query
@@ -70,12 +77,9 @@ class TestCatalogueBrowser:
         )
 
         # Case-insensitive (default)
-        results_ci = browser.search("POPULATION")
-        assert len(results_ci) > 0
-
-        # Case-sensitive
-        browser.search("POPULATION", case_sensitive=True)
-        # May have fewer results than case-insensitive
+        assert len(browser.search("POPULATION")) == 22
+        assert len(browser.search("Population", case_sensitive=True)) == 22
+        assert len(browser.search("population", case_sensitive=True)) == 3
 
     @responses.activate
     def test_search_specific_fields(self, browser, sample_catalogue):
@@ -89,8 +93,10 @@ class TestCatalogueBrowser:
         )
 
         # Search only in title
-        results = browser.search("population", search_fields=["title"])
-        assert all(isinstance(ind, Indicator) for ind in results)
+        # opc=3 titles are Portuguese under either language (a quirk of INE's main group),
+        # so an English word matches no title.
+        assert browser.search("population", search_fields=["title"]) == []
+        assert len(browser.search("população", search_fields=["title"])) > 0
 
     @responses.activate
     def test_search_empty_query(self, browser, sample_catalogue):
@@ -121,8 +127,8 @@ class TestCatalogueBrowser:
 
         assert isinstance(themes, list)
         assert all(isinstance(theme, str) for theme in themes)
-        # Themes should be sorted
         assert themes == sorted(themes)
+        assert len(themes) == 24
 
     @responses.activate
     def test_list_subthemes(self, browser, sample_catalogue):
@@ -169,21 +175,20 @@ class TestCatalogueBrowser:
                     assert recent[i].last_update >= recent[i + 1].last_update
 
     @responses.activate
-    def test_get_by_code(self, browser, sample_catalogue):
+    def test_get_by_code(self, browser, catalogue_entry):
         """Test getting indicator by code."""
         responses.add(
             responses.GET,
             "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
+            body=catalogue_entry,
             status=200,
             content_type="application/xml",
         )
 
-        indicator = browser.get_by_code("0004167")
+        indicator = browser.get_by_code("0008273")
 
-        assert indicator is not None
         assert isinstance(indicator, Indicator)
-        assert indicator.varcd == "0004167"
+        assert indicator.varcd == "0008273"
 
     @responses.activate
     def test_get_by_code_invalid(self, browser):
@@ -199,18 +204,18 @@ class TestCatalogueBrowser:
         assert indicator is None
 
     @responses.activate
-    def test_validate_indicator(self, browser, sample_catalogue):
+    def test_validate_indicator(self, browser, catalogue_entry):
         """Test indicator validation."""
         responses.add(
             responses.GET,
             "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
+            body=catalogue_entry,
             status=200,
             content_type="application/xml",
         )
 
         # Valid indicator
-        assert browser.validate_indicator("0004167") is True
+        assert browser.validate_indicator("0008273") is True
 
         # Invalid indicator (will fail when trying to get it)
         responses.add(

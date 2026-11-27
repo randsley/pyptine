@@ -1,6 +1,7 @@
 """DataFrame processing utilities for pyptine."""
 
 import logging
+import warnings
 from typing import Any, Optional, Union, cast
 
 import pandas as pd
@@ -11,14 +12,17 @@ logger = logging.getLogger(__name__)
 
 
 def json_to_dataframe(
-    data: Union[list[dict[str, Any]], dict[str, Any]],
+    data: list[dict[str, Any]],
     normalize: bool = True,
     parse_dates: bool = True,
 ) -> pd.DataFrame:
-    """Convert INE JSON data to pandas DataFrame.
+    """Convert a list of data rows to a pandas DataFrame.
+
+    For INE's responses use ``DataResponse.to_dataframe()``, which keeps ``period`` and
+    ``period_code``; a raw response is keyed by period and is refused here.
 
     Args:
-        data: Raw JSON data from API (list of dicts or dict with 'dados' key)
+        data: Rows (dicts), e.g. ``DataResponse.data``
         normalize: Flatten nested structures
         parse_dates: Attempt to parse date columns
 
@@ -30,17 +34,18 @@ def json_to_dataframe(
 
     Example:
         >>> data = [
-        ...     {"periodo": "2023", "geocod": "1", "valor": "10639726"},
-        ...     {"periodo": "2022", "geocod": "1", "valor": "10467366"},
+        ...     {"period_code": "S7A2023", "geocod": "PT", "value": 10639726.0},
+        ...     {"period_code": "S7A2022", "geocod": "PT", "value": 10467366.0},
         ... ]
         >>> df = json_to_dataframe(data)
         >>> print(df.head())
     """
     try:
-        # Handle dict with 'dados' key (full API response)
-        # If data is a dict without 'dados', treat it as a single data point
         if isinstance(data, dict):
-            data = data.get("dados", [data])
+            raise DataProcessingError(
+                "json_to_dataframe takes a list of rows, not a response object; parse INE's "
+                "responses with the INE client (DataResponse.to_dataframe())"
+            )
 
         # Handle empty data
         if not data:
@@ -52,9 +57,6 @@ def json_to_dataframe(
 
         if df.empty:
             return df
-
-        # Clean up column names (remove internal prefixes)
-        df.columns = [col.replace("_", " ").strip() for col in df.columns]
 
         # Convert value column to numeric
         value_cols = [col for col in df.columns if "valor" in col.lower() or col.lower() == "value"]
@@ -86,7 +88,7 @@ def json_to_dataframe(
 def pivot_by_dimension(
     df: pd.DataFrame,
     dimension: str,
-    value_column: Union[str, list[str]] = "valor",
+    value_column: Union[str, list[str]] = "value",
     aggfunc: str = "first",
 ) -> pd.DataFrame:
     """Pivot DataFrame by specific dimension.
@@ -102,9 +104,9 @@ def pivot_by_dimension(
 
     Example:
         >>> df = pd.DataFrame({
-        ...     "periodo": ["2023", "2023", "2022"],
+        ...     "period_code": ["S7A2023", "S7A2023", "S7A2022"],
         ...     "region": ["North", "South", "North"],
-        ...     "valor": [100, 200, 150]
+        ...     "value": [100, 200, 150]
         ... })
         >>> pivoted = pivot_by_dimension(df, "region")
     """
@@ -215,13 +217,16 @@ def _parse_date_column(series: pd.Series) -> pd.Series:
     try:
         # Try different date formats
 
-        # Check if it's just a year
+        # Years, and INE's period codes and labels ("S7A2022", "1st Quarter 2026"), stay
+        # as they are; so does any column not every value of which parses as a date.
         if series.astype(str).str.match(r"^\d{4}$").all():
-            # Keep as string for years
             return series
-
-        # Try pandas date parsing
-        return cast(pd.Series, pd.to_datetime(series, errors="coerce"))
+        with warnings.catch_warnings():  # "could not infer format": a non-date column
+            warnings.simplefilter("ignore", UserWarning)
+            parsed = pd.to_datetime(series, errors="coerce")
+        if parsed[series.notna()].isna().any():
+            return series
+        return cast(pd.Series, parsed)
 
     except Exception as e:
         logger.debug(f"Could not parse dates in column: {str(e)}")
@@ -230,8 +235,8 @@ def _parse_date_column(series: pd.Series) -> pd.Series:
 
 def aggregate_by_period(
     df: pd.DataFrame,
-    period_column: str = "periodo",
-    value_column: Union[str, list[str]] = "valor",
+    period_column: str = "period_code",
+    value_column: Union[str, list[str]] = "value",
     agg_func: Union[str, list[str]] = "sum",
 ) -> pd.DataFrame:
     """Aggregate data by time period.
@@ -247,9 +252,9 @@ def aggregate_by_period(
 
     Example:
         >>> df = pd.DataFrame({
-        ...     "periodo": ["2023", "2023", "2022"],
+        ...     "period_code": ["S7A2023", "S7A2023", "S7A2022"],
         ...     "region": ["A", "B", "A"],
-        ...     "valor": [100, 200, 150]
+        ...     "value": [100, 200, 150]
         ... })
         >>> agg = aggregate_by_period(df)
     """
@@ -284,7 +289,10 @@ def filter_by_geography(
     Args:
         df: Input DataFrame
         geography: Geographic region to filter (e.g., "Portugal", "Lisboa")
-        geography_column: Column name for geography (auto-detected if None)
+        geography_column: Column name for geography (if None: ``geodsg``, INE's place names,
+            else the first column whose name suggests geography). Names are matched as
+            substrings ("Lisboa" also matches "Área Metropolitana de Lisboa"); filter on
+            ``geocod`` for an exact unit
 
     Returns:
         Filtered DataFrame
@@ -292,12 +300,14 @@ def filter_by_geography(
     Example:
         >>> df = pd.DataFrame({
         ...     "geodsg": ["Portugal", "Lisboa", "Porto"],
-        ...     "valor": [100, 50, 30]
+        ...     "value": [100, 50, 30]
         ... })
         >>> filtered = filter_by_geography(df, "Portugal")
         >>> len(filtered)
         1
     """
+    if geography_column is None and "geodsg" in df.columns:
+        geography_column = "geodsg"  # INE's place names (geocod holds the codes)
     if geography_column is None:
         # Auto-detect geography column
         geo_keywords = ["geo", "geography", "region", "area", "location"]
@@ -321,14 +331,16 @@ def filter_by_geography(
 
 def get_latest_period(
     df: pd.DataFrame,
-    period_column: str = "periodo",
+    period_column: str = "period_code",
     n: int = 1,
 ) -> pd.DataFrame:
     """Get data for the latest N periods.
 
     Args:
         df: Input DataFrame
-        period_column: Column containing time periods
+        period_column: Column containing time periods. The default, ``period_code``, sorts
+            chronologically within an indicator (S7A2022, S5A20261, S3A202601); INE's
+            labels (``period``) do not
         n: Number of latest periods to return
 
     Returns:
@@ -336,12 +348,12 @@ def get_latest_period(
 
     Example:
         >>> df = pd.DataFrame({
-        ...     "periodo": ["2021", "2022", "2023"],
-        ...     "valor": [100, 150, 200]
+        ...     "period_code": ["S7A2021", "S7A2022", "S7A2023"],
+        ...     "value": [100, 150, 200]
         ... })
         >>> latest = get_latest_period(df)
-        >>> latest["periodo"].iloc[0]
-        '2023'
+        >>> latest["period_code"].iloc[0]
+        'S7A2023'
     """
     if period_column not in df.columns:
         raise ValueError(f"Period column '{period_column}' not found")

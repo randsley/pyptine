@@ -102,12 +102,20 @@ class CatalogueClient(INEClient):
 
             if not indicators:
                 raise DataProcessingError(f"Indicator {varcd} not found in catalogue")
+            # opc=1 answers with one entry; take it only if it is the one asked for.
+            codes = [i.varcd for i in indicators]
+            if codes != [varcd]:
+                raise DataProcessingError(
+                    f"The catalogue answered {varcd} with {len(codes)} entries "
+                    f"({', '.join(codes[:5])}{', ...' if len(codes) > 5 else ''}), "
+                    f"not the one entry for {varcd}"
+                )
 
             logger.info(f"Retrieved indicator {varcd}: {indicators[0].title}")
             return indicators[0]
 
-        except Exception as e:
-            logger.error(f"Failed to get indicator {varcd}: {str(e)}")
+        except Exception as e:  # the caller gets the exception; no ERROR line here
+            logger.debug(f"Failed to get indicator {varcd}: {str(e)}")
             raise
 
     def get_main_indicators(self) -> list[Indicator]:

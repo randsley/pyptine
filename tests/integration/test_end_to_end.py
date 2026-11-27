@@ -1,4 +1,7 @@
-"""End-to-end integration tests for pyptine."""
+"""End-to-end tests of INE, on INE's recorded responses (tests/fixtures/ine/).
+
+sample_metadata and sample_data are 0008273 (resident population); sample_catalogue is the
+main group (opc=3), whose titles are Portuguese under either language."""
 
 import json
 
@@ -45,20 +48,24 @@ class TestINEIntegration:
 
         # Search for indicators
         results = ine.search("population")
-        assert len(results) > 0
-        assert any("population" in ind.title.lower() for ind in results)
+        assert len(results) == 22
+        assert all(
+            "population" in " ".join([ind.title, ind.description or "", *ind.keywords]).lower()
+            for ind in results
+        )
 
         # Get data as DataFrame
-        response = ine.get_data("0004167")
+        response = ine.get_data(
+            "0008273", {"Dim1": ["S7A2021", "S7A2022"], "Dim2": "PT", "Dim3": "T", "Dim4": "T"}
+        )
         df = response.to_dataframe()
-        assert isinstance(df, pd.DataFrame)
-        assert not df.empty
+        assert list(df["value"]) == [10599117.0, 10929704.0]
 
         # Get data as JSON
         json_output_file = tmp_path / "basic_workflow_output.json"
         response.to_json(json_output_file)
         assert json_output_file.exists()
-        assert "0004167" in json_output_file.read_text()
+        assert "0008273" in json_output_file.read_text()
 
         # Get data as dict
         data_dict = response.to_dict()
@@ -78,13 +85,13 @@ class TestINEIntegration:
         ine = INE(language="EN", cache=False)
 
         # Get metadata
-        metadata = ine.get_metadata("0004167", catalogue=False)
-        assert metadata.varcd == "0004167"
+        metadata = ine.get_metadata("0008273", catalogue=False)
+        assert metadata.varcd == "0008273"
         assert metadata.title
         assert len(metadata.dimensions) > 0
 
         # Get dimensions
-        dimensions = ine.get_dimensions("0004167")
+        dimensions = ine.get_dimensions("0008273")
         assert len(dimensions) > 0
         assert all(hasattr(dim, "name") for dim in dimensions)
         assert all(hasattr(dim, "values") for dim in dimensions)
@@ -111,7 +118,7 @@ class TestINEIntegration:
 
         # Export to CSV
         output_file = tmp_path / "test_export.csv"
-        ine.export_csv("0004167", output_file)
+        ine.export_csv("0008273", output_file)
 
         # Verify file exists and has content
         assert output_file.exists()
@@ -122,9 +129,14 @@ class TestINEIntegration:
         assert not df.empty
 
     @responses.activate
-    def test_export_json(self, sample_data, tmp_path):
+    def test_export_json(self, sample_metadata, sample_data, tmp_path):
         """Test JSON export functionality."""
-        # Mock data endpoint
+        responses.add(
+            responses.GET,
+            "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp",
+            json=sample_metadata,
+            status=200,
+        )
         responses.add(
             responses.GET,
             "https://www.ine.pt/ine/json_indicador/pindica.jsp",
@@ -136,16 +148,15 @@ class TestINEIntegration:
 
         # Export to JSON
         output_file = tmp_path / "test_export.json"
-        ine.export_json("0004167", output_file)
+        ine.export_json("0008273", output_file)
         assert output_file.exists()
 
         # Verify JSON content
         with open(output_file) as f:
             data = json.load(f)
         assert isinstance(data, dict)
-        assert data["varcd"] == "0004167"
-        assert "data" in data
-        assert len(data["data"]) > 0
+        assert data["varcd"] == "0008273"
+        assert len(data["data"]) == 2
         assert output_file.stat().st_size > 0
 
     @responses.activate
@@ -164,21 +175,20 @@ class TestINEIntegration:
 
         # Get all themes
         themes = ine.list_themes()
-        assert len(themes) > 0
+        assert len(themes) == 24
 
-        # Filter by theme
-        if themes:
-            indicators = ine.search(query="", theme=themes[0])
-            assert all(ind.theme == themes[0] for ind in indicators if ind.theme)
+        indicators = ine.search(query="", theme="Population")
+        assert len(indicators) == 21
+        assert all(ind.theme == "Population" for ind in indicators)
 
     @responses.activate
-    def test_indicator_validation(self, sample_catalogue):
+    def test_indicator_validation(self, fixtures_dir):
         """Test indicator validation."""
         # Mock catalogue endpoint
         responses.add(
             responses.GET,
             "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
+            body=(fixtures_dir / "catalogue_opc1_0008273_EN.xml").read_bytes(),
             status=200,
             content_type="application/xml",
         )
@@ -186,7 +196,7 @@ class TestINEIntegration:
         ine = INE(language="EN", cache=False)
 
         # Valid indicator
-        assert ine.validate_indicator("0004167")
+        assert ine.validate_indicator("0008273")
 
         # Mock invalid indicator
         responses.add(
@@ -239,13 +249,13 @@ class TestINEIntegration:
         ine = INE(language="EN", cache=False)
 
         # Get dimensions
-        dimensions = ine.get_dimensions("0004167")
+        dimensions = ine.get_dimensions("0008273")
         assert len(dimensions) > 0
 
         # Get data with dimension filter
         if dimensions and dimensions[0].values:
             dim_filter = {"Dim1": dimensions[0].values[0].code}
-            response = ine.get_data("0004167", dimensions=dim_filter)
+            response = ine.get_data("0008273", dimensions=dim_filter)
             df = response.to_dataframe()
             assert isinstance(df, pd.DataFrame)
 
@@ -284,4 +294,4 @@ class TestINEIntegration:
 
         # Should raise APIError after retries
         with pytest.raises(APIError):  # Will be APIError or similar
-            ine.get_data("0004167")
+            ine.get_data("0008273")
