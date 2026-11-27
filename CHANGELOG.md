@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-27
+
 Fixes found by an audit against the live INE API (2026-11-27). Several change behaviour.
 0.3.3 was tagged but never published on PyPI: from PyPI, this release follows 0.3.2, so read
 0.3.3's notes too.
@@ -244,7 +246,8 @@ What breaks existing code, in short (details below):
 - Project summary document
 - Three example files (basic usage, advanced filtering, CLI examples)
 
-[Unreleased]: https://github.com/randsley/pyptine/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/randsley/pyptine/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/randsley/pyptine/releases/tag/v0.4.0
 [0.3.3]: https://github.com/randsley/pyptine/releases/tag/v0.3.3 "Tagged; not published on PyPI"
 [0.3.2]: https://github.com/randsley/pyptine/releases/tag/v0.3.2
 [0.3.1]: https://github.com/randsley/pyptine/releases/tag/v0.3.1

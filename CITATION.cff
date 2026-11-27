@@ -13,6 +13,8 @@ authors:
 doi: 10.5281/zenodo.19118875
 repository-code: "https://github.com/randsley/pyptine"
 license: MIT
+version: 0.4.0
+date-released: "2026-11-27"
 keywords:
   - Statistics Portugal
   - INE
