@@ -1,0 +1,45 @@
+
+
+
+
+
+
+
+
+
+
+
+  <catalog>
+  <extraction_date><![CDATA[Friday, 27 November 2026, 04:17:59.961 PM]]></extraction_date>
+  <language>PT</language>    
+  
+  <indicator id="0008273">
+  
+        	 <theme><![CDATA[População]]></theme>
+             <subtheme><![CDATA[Estimativas de população]]></subtheme>    	 
+        	
+  <keywords>INE,<![CDATA[População]]>,<![CDATA[(N.º)]]>,<![CDATA[residente]]>,<![CDATA[População]]>,<![CDATA[Estimativas de população]]></keywords>
+  <title><![CDATA[População residente (N.º)]]></title>
+  <varcd><![CDATA[0008273]]></varcd>
+  <description><![CDATA[População residente (N.º) por Local de residência (NUTS - 2013), Sexo e Grupo etário; Anual - INE, Estimativas anuais da população residente]]></description>
+  <geo_lastlevel><![CDATA[Município]]></geo_lastlevel>
+  <source><![CDATA[INE, Estimativas anuais da população residente]]></source>
+  <dates>
+		<last_period_available><![CDATA[S7A2023]]></last_period_available>
+		<last_update><![CDATA[17-07-2026]]></last_update>		
+  </dates>      
+  <periodicity><![CDATA[ Anual]]></periodicity>
+  
+ 			<update_type>D</update_type>  
+ 
+  <html>
+        <bdd_url><![CDATA[https://www.ine.pt/xurl/indx/0008273]]></bdd_url>
+        <metainfo_url><![CDATA[https://www.ine.pt/xurl/metax/0008273]]></metainfo_url>	
+  </html>
+  <json>
+        <json_dataset><![CDATA[ https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0008273&lang=PT]]></json_dataset>
+        <json_metainfo><![CDATA[ https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=0008273&lang=PT]]></json_metainfo>    
+  </json>  
+</indicator>
+       
+</catalog>

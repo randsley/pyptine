@@ -1,0 +1,2 @@
+# Recorded INE responses: keep the bytes exactly as served (PROVENANCE.json holds their SHA-256).
+tests/fixtures/ine/** -text

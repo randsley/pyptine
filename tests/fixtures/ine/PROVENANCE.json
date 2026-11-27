@@ -1,0 +1,111 @@
+{
+  "source": "Statistics Portugal (INE), https://www.ine.pt",
+  "captured_by": "tools/capture_fixtures.py",
+  "files": {
+    "meta_0008273_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=0008273&lang=EN",
+      "purpose": "metadata, 4 dimensions",
+      "captured": "2026-11-27T16:17:32+00:00",
+      "sha256": "a42f1c9d9166dfdee405449e2741779dafdc43bbf08ba0fd9a4929422c9251c6",
+      "bytes": 86039
+    },
+    "meta_0008273_PT.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=0008273&lang=PT",
+      "purpose": "the same, Portuguese",
+      "captured": "2026-11-27T16:17:34+00:00",
+      "sha256": "8756416abb527194c63c48f7ce59fba17b696013fa873a266a01349a1c4508c0",
+      "bytes": 86023
+    },
+    "meta_0012234_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=0012234&lang=EN",
+      "purpose": "cat_id H1 vs categ_cod H.1",
+      "captured": "2026-11-27T16:17:36+00:00",
+      "sha256": "eb74a2b0f65657f466b2c01c6befe264339d05f42841aa6f2bd0ab3e517c4a2a",
+      "bytes": 228347
+    },
+    "meta_9999999_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=9999999&lang=EN",
+      "purpose": "unknown code: HTTP 200 + Falso",
+      "captured": "2026-11-27T16:17:38+00:00",
+      "sha256": "0a68f2dd84174877c5b455ea55a73d7af31aff5dddb587ce78995fe1f6c741a8",
+      "bytes": 279
+    },
+    "data_0008273_latest_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0008273&lang=EN&Dim2=PT&Dim3=T&Dim4=T",
+      "purpose": "no Dim1: latest period only",
+      "captured": "2026-11-27T16:17:40+00:00",
+      "sha256": "600ebbd9d9279ce3c26b1138ba1abd816569c4045ffc67c26b75bf7b18837aac",
+      "bytes": 738
+    },
+    "data_0008273_S7A2021_S7A2022_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0008273&lang=EN&Dim1=S7A2021%2CS7A2022&Dim2=PT&Dim3=T&Dim4=T",
+      "purpose": "two periods, Dados keyed by label",
+      "captured": "2026-11-27T16:17:43+00:00",
+      "sha256": "8867130907a9f2b69ba2bcce92ea282fd777a71d955eaa45bf97d946e85a0a78",
+      "bytes": 971
+    },
+    "data_0008273_S7A2021_S7A2022_PT.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0008273&lang=PT&Dim1=S7A2021%2CS7A2022&Dim2=PT&Dim3=T&Dim4=T",
+      "purpose": "the same, Portuguese",
+      "captured": "2026-11-27T16:17:46+00:00",
+      "sha256": "b760a34d1a09aea626e98a4bcef759365aefb5db8461283c1a39238e915b615d",
+      "bytes": 967
+    },
+    "data_0008273_count1_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0008273&lang=EN&Dim1=S7A2021%2CS7A2022&start=0&count=1&Dim2=PT&Dim3=T&Dim4=T",
+      "purpose": "start/count ignored: still 2 rows",
+      "captured": "2026-11-27T16:17:48+00:00",
+      "sha256": "50c81a95bab727b512003b335b3e5b95a01954f6d0bc1539fc52cba02738ae70",
+      "bytes": 971
+    },
+    "data_0008273_S7A2022_levels_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0008273&lang=EN&Dim1=S7A2022&Dim3=T&Dim4=T",
+      "purpose": "every geographic level in one response",
+      "captured": "2026-11-27T16:17:50+00:00",
+      "sha256": "5089eed759032b323b81e4ea2e8f0cfb683f3941afa8cbb20b1945e7ec14bc8b",
+      "bytes": 74988
+    },
+    "data_0008273_Dim1label_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0008273&lang=EN&Dim1=2022",
+      "purpose": "period label in Dim1: refused (Cod 4)",
+      "captured": "2026-11-27T16:17:52+00:00",
+      "sha256": "fc6792702a4a08e840aa1d4975e9636ec86deab73608ba237a318d864463dd80",
+      "bytes": 305
+    },
+    "data_9999999_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=9999999&lang=EN",
+      "purpose": "unknown code: HTTP 200 + Falso",
+      "captured": "2026-11-27T16:17:53+00:00",
+      "sha256": "54b33f840399a42861ada4a65988090c12508271eb5ed7e264969560b811a40a",
+      "bytes": 279
+    },
+    "data_0012234_H1_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0012234&lang=EN&Dim1=S5A20261&Dim2=PT&Dim3=H1",
+      "purpose": "cat_id accepted",
+      "captured": "2026-11-27T16:17:55+00:00",
+      "sha256": "fef9e0755322cf4b977cdb51a1e0ced594050b14da4d166e986971b653750610",
+      "bytes": 781
+    },
+    "data_0012234_Hdot1_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0012234&lang=EN&Dim1=S5A20261&Dim2=PT&Dim3=H.1",
+      "purpose": "categ_cod refused",
+      "captured": "2026-11-27T16:17:57+00:00",
+      "sha256": "d41de2b41822727eed6ba248139cd8a767657991674aca9818378a8075a22d37",
+      "bytes": 305
+    },
+    "catalogue_opc1_0008273_EN.xml": {
+      "url": "https://www.ine.pt/ine/xml_indic.jsp?opc=1&varcd=0008273&lang=EN",
+      "purpose": "one catalogue entry",
+      "captured": "2026-11-27T16:17:58+00:00",
+      "sha256": "385eb089d2ea17e6c4348d3bfffa00c158e141ad5634a8bda2970e72784075ab",
+      "bytes": 1665
+    },
+    "catalogue_opc1_0008273_PT.xml": {
+      "url": "https://www.ine.pt/ine/xml_indic.jsp?opc=1&varcd=0008273&lang=PT",
+      "purpose": "the same, Portuguese",
+      "captured": "2026-11-27T16:18:00+00:00",
+      "sha256": "5d5025ee71078ac6c57eb0d98e1259cbae94f340f3c47b9f8726fdeb09ccbcb6",
+      "bytes": 1668
+    }
+  }
+}

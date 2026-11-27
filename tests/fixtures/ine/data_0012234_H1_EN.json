@@ -1,0 +1,23 @@
+[ {
+  "IndicadorCod" : "0012234",
+  "IndicadorDsg" : "Median value of dwellings sales in the last 12 months (Methodology 2022 - €/ m²) by Geographic location (NUTS - 2024) and Category of housing unit; Quarterly - Statistics on house prices at local level (Methodology 2022)",
+  "MetaInfUrl" : "https://www.ine.pt/bddXplorer/htdocs/minfo.jsp?var_cd=0012234&lingua=EN",
+  "DataExtracao" : "2026-11-27T16:17:54.642Z",
+  "DataUltimoAtualizacao" : "2026-10-23",
+  "UltimoPref" : "2nd Quarter 2026",
+  "Dados" : {
+    "1st Quarter 2026" : [ {
+      "geocod" : "PT",
+      "geodsg" : "Portugal",
+      "dim_3" : "H1",
+      "dim_3_t" : "Total",
+      "ind_string" : "2 168",
+      "valor" : "2168"
+    } ]
+  },
+  "Sucesso" : {
+    "Verdadeiro" : [ {
+      "Msg" : "OK"
+    } ]
+  }
+} ]

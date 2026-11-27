@@ -1,0 +1,45 @@
+
+
+
+
+
+
+
+
+
+
+
+  <catalog>
+  <extraction_date><![CDATA[Friday, 27 November 2026, 04:17:58.067 PM]]></extraction_date>
+  <language>EN</language>    
+  
+  <indicator id="0008273">
+  
+        	 <theme><![CDATA[Population]]></theme>
+             <subtheme><![CDATA[Population estimates]]></subtheme>    	 
+        	
+  <keywords>INE,<![CDATA[Resident]]>,<![CDATA[(No.)]]>,<![CDATA[population]]>,<![CDATA[Population]]>,<![CDATA[Population estimates]]></keywords>
+  <title><![CDATA[Resident population (No.)]]></title>
+  <varcd><![CDATA[0008273]]></varcd>
+  <description><![CDATA[Resident population (No.) by Place of residence (NUTS - 2013), Sex and Age group; Annual - Statistics Portugal, Annual estimates of resident population]]></description>
+  <geo_lastlevel><![CDATA[Município]]></geo_lastlevel>
+  <source><![CDATA[Statistics Portugal, Annual estimates of resident population]]></source>
+  <dates>
+		<last_period_available><![CDATA[S7A2023]]></last_period_available>
+		<last_update><![CDATA[17-07-2026]]></last_update>		
+  </dates>      
+  <periodicity><![CDATA[ Annual]]></periodicity>
+  
+ 			<update_type>D</update_type>  
+ 
+  <html>
+        <bdd_url><![CDATA[https://www.ine.pt/xurl/indx/0008273]]></bdd_url>
+        <metainfo_url><![CDATA[https://www.ine.pt/xurl/metax/0008273]]></metainfo_url>	
+  </html>
+  <json>
+        <json_dataset><![CDATA[ https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0008273&lang=EN]]></json_dataset>
+        <json_metainfo><![CDATA[ https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=0008273&lang=EN]]></json_metainfo>    
+  </json>  
+</indicator>
+       
+</catalog>

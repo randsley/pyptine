@@ -158,3 +158,6 @@ http_cache/
 
 # Claude Code
 .claude/
+
+# Claude Code instructions (local only)
+CLAUDE.md

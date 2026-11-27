@@ -1,0 +1,68 @@
+{
+  "catalogue_opc2_size": 13290,
+  "catalogue_opc3_size": 309,
+  "catalogue_tags": [
+    "dates",
+    "description",
+    "geo_lastlevel",
+    "html",
+    "json",
+    "keywords",
+    "periodicity",
+    "source",
+    "subtheme",
+    "theme",
+    "title",
+    "update_type",
+    "varcd"
+  ],
+  "data": [
+    "Dados",
+    "DataExtracao",
+    "DataUltimoAtualizacao",
+    "IndicadorCod",
+    "IndicadorDsg",
+    "MetaInfUrl",
+    "Sucesso",
+    "UltimoPref"
+  ],
+  "data_row": [
+    "dim_3",
+    "dim_3_t",
+    "dim_4",
+    "dim_4_t",
+    "geocod",
+    "geodsg",
+    "ind_string",
+    "valor"
+  ],
+  "metadata": [
+    "DataExtracao",
+    "DataUltimaAtualizacao",
+    "Dimensoes",
+    "IndicadorCod",
+    "IndicadorNome",
+    "Lingua",
+    "Periodic",
+    "Potencia10",
+    "PrecisaoDecimal",
+    "PrimeiroPeriodo",
+    "Sucesso",
+    "UltimoPeriodo",
+    "UnidadeMedida"
+  ],
+  "metadata_category": [
+    "cat_id",
+    "categ_cod",
+    "categ_dsg",
+    "categ_nivel",
+    "categ_ord",
+    "dim_num"
+  ],
+  "metadata_dimension": [
+    "abrv",
+    "dim_num",
+    "nota_dsg",
+    "versao"
+  ]
+}

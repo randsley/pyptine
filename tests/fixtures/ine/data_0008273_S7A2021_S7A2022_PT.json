@@ -1,0 +1,35 @@
+[ {
+  "IndicadorCod" : "0008273",
+  "IndicadorDsg" : "População residente (N.º) por Local de residência (NUTS - 2013), Sexo e Grupo etário; Anual - INE, Estimativas anuais da população residente",
+  "MetaInfUrl" : "https://www.ine.pt/bddXplorer/htdocs/minfo.jsp?var_cd=0008273&lingua=PT",
+  "DataExtracao" : "2026-11-27T16:17:44.385Z",
+  "DataUltimoAtualizacao" : "2026-07-17",
+  "UltimoPref" : "2023",
+  "Dados" : {
+    "2021" : [ {
+      "geocod" : "PT",
+      "geodsg" : "Portugal",
+      "dim_3" : "T",
+      "dim_3_t" : "HM",
+      "dim_4" : "T",
+      "dim_4_t" : "Total",
+      "ind_string" : "10 599 117",
+      "valor" : "10599117"
+    } ],
+    "2022" : [ {
+      "geocod" : "PT",
+      "geodsg" : "Portugal",
+      "dim_3" : "T",
+      "dim_3_t" : "HM",
+      "dim_4" : "T",
+      "dim_4_t" : "Total",
+      "ind_string" : "10 929 704",
+      "valor" : "10929704"
+    } ]
+  },
+  "Sucesso" : {
+    "Verdadeiro" : [ {
+      "Msg" : "OK"
+    } ]
+  }
+} ]
