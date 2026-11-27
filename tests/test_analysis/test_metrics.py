@@ -16,10 +16,10 @@ from pyptine.analysis.metrics import (
 def sample_annual_data():
     """Sample annual data for YoY growth testing."""
     return [
-        {"Period": "2020", "value": 100},
-        {"Period": "2021", "value": 110},
-        {"Period": "2022", "value": 120},
-        {"Period": "2023", "value": 132},
+        {"period_code": "2020", "value": 100},
+        {"period_code": "2021", "value": 110},
+        {"period_code": "2022", "value": 120},
+        {"period_code": "2023", "value": 132},
     ]
 
 
@@ -27,11 +27,11 @@ def sample_annual_data():
 def sample_monthly_data():
     """Sample monthly data for MoM change testing."""
     return [
-        {"Period": "2023-01", "value": 100},
-        {"Period": "2023-02", "value": 105},
-        {"Period": "2023-03", "value": 110},
-        {"Period": "2023-04", "value": 108},
-        {"Period": "2023-05", "value": 115},
+        {"period_code": "2023-01", "value": 100},
+        {"period_code": "2023-02", "value": 105},
+        {"period_code": "2023-03", "value": 110},
+        {"period_code": "2023-04", "value": 108},
+        {"period_code": "2023-05", "value": 115},
     ]
 
 
@@ -39,12 +39,12 @@ def sample_monthly_data():
 def sample_timeseries_data():
     """Sample time series data for moving average testing."""
     return [
-        {"Period": "2023-01", "value": 100},
-        {"Period": "2023-02", "value": 110},
-        {"Period": "2023-03", "value": 105},
-        {"Period": "2023-04", "value": 120},
-        {"Period": "2023-05", "value": 115},
-        {"Period": "2023-06", "value": 125},
+        {"period_code": "2023-01", "value": 100},
+        {"period_code": "2023-02", "value": 110},
+        {"period_code": "2023-03", "value": 105},
+        {"period_code": "2023-04", "value": 120},
+        {"period_code": "2023-05", "value": 115},
+        {"period_code": "2023-06", "value": 125},
     ]
 
 
@@ -84,7 +84,7 @@ class TestYoYGrowth:
 
     def test_yoy_growth_missing_column(self):
         """Test YoY growth with missing column."""
-        data = [{"Period": "2020"}]  # Missing 'value' column
+        data = [{"period_code": "2020"}]  # Missing 'value' column
         with pytest.raises(ValueError):
             calculate_yoy_growth(data)
 
@@ -125,7 +125,7 @@ class TestMoMChange:
 
     def test_mom_change_missing_column(self):
         """Test MoM change with missing column."""
-        data = [{"Period": "2023-01"}]  # Missing 'value' column
+        data = [{"period_code": "2023-01"}]  # Missing 'value' column
         with pytest.raises(ValueError):
             calculate_mom_change(data)
 
@@ -179,13 +179,13 @@ class TestMovingAverage:
 
     def test_moving_average_invalid_window(self):
         """Test moving average with invalid window size."""
-        data = [{"Period": "2023-01", "value": 100}]
+        data = [{"period_code": "2023-01", "value": 100}]
         with pytest.raises(ValueError):
             calculate_moving_average(data, window=0)
 
     def test_moving_average_missing_column(self):
         """Test moving average with missing column."""
-        data = [{"Period": "2023-01"}]  # Missing 'value' column
+        data = [{"period_code": "2023-01"}]  # Missing 'value' column
         with pytest.raises(ValueError):
             calculate_moving_average(data)
 
@@ -232,13 +232,13 @@ class TestExponentialMovingAverage:
 
     def test_ema_invalid_span(self):
         """Test EMA with invalid span."""
-        data = [{"Period": "2023-01", "value": 100}]
+        data = [{"period_code": "2023-01", "value": 100}]
         with pytest.raises(ValueError):
             calculate_exponential_moving_average(data, span=0)
 
     def test_ema_missing_column(self):
         """Test EMA with missing column."""
-        data = [{"Period": "2023-01"}]  # Missing 'value' column
+        data = [{"period_code": "2023-01"}]  # Missing 'value' column
         with pytest.raises(ValueError):
             calculate_exponential_moving_average(data)
 
@@ -251,7 +251,7 @@ class TestDataIntegrity:
         result = calculate_yoy_growth(sample_annual_data)
 
         for i, item in enumerate(result):
-            assert item["Period"] == sample_annual_data[i]["Period"]
+            assert item["period_code"] == sample_annual_data[i]["period_code"]
             assert item["value"] == sample_annual_data[i]["value"]
 
     def test_data_not_mutated(self, sample_annual_data):

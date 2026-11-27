@@ -313,10 +313,18 @@ class MetadataClient(INEClient):
                                 if isinstance(value_list, list):
                                     for val_data in value_list:
                                         if isinstance(val_data, dict):
+                                            # The filter takes cat_id, not categ_cod
+                                            # (0012234 Dim3: "H1" accepted, "H.1" refused).
+                                            if not val_data.get("cat_id"):
+                                                raise DataProcessingError(
+                                                    f"Category without cat_id in {key}: "
+                                                    f"{val_data!r}"
+                                                )
                                             value = DimensionValue(
-                                                code=val_data.get("categ_cod", ""),
+                                                code=val_data["cat_id"],
                                                 label=val_data.get("categ_dsg", ""),
                                                 order=val_data.get("categ_ord"),
+                                                categ_cod=val_data.get("categ_cod"),
                                             )
                                             dim_values_map[dim_num].append(value)
 

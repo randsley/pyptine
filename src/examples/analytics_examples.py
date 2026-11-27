@@ -30,7 +30,7 @@ def example_1_yoy_growth() -> None:
     print("\nData with YoY growth:")
     print(f"Columns: {list(df.columns)}")
     print("\nFirst 10 rows:")
-    print(df[["Period", "value", "yoy_growth"]].head(10))
+    print(df[["period", "value", "yoy_growth"]].head(10))
 
     # Save to CSV
     output_file = "gdp_yoy_growth.csv"
@@ -61,7 +61,7 @@ def example_2_mom_change() -> None:
     print("\nData with MoM change:")
     print(f"Columns: {list(df.columns)}")
     print("\nFirst 10 rows:")
-    print(df[["Period", "value", "mom_change"]].head(10))
+    print(df[["period", "value", "mom_change"]].head(10))
 
     # Save to CSV
     output_file = "unemployment_mom_change.csv"
@@ -92,7 +92,7 @@ def example_3_moving_average() -> None:
     print("\nData with moving average:")
     print(f"Columns: {list(df.columns)}")
     print("\nFirst 10 rows:")
-    print(df[["Period", "value", "moving_avg"]].head(10))
+    print(df[["period", "value", "moving_avg"]].head(10))
 
     # Save to CSV
     output_file = "gdp_moving_average.csv"
@@ -123,7 +123,7 @@ def example_4_exponential_moving_average() -> None:
     print("\nData with exponential moving average:")
     print(f"Columns: {list(df.columns)}")
     print("\nFirst 10 rows:")
-    print(df[["Period", "value", "exp_moving_avg"]].head(10))
+    print(df[["period", "value", "exp_moving_avg"]].head(10))
 
     # Save to CSV
     output_file = "gdp_ema.csv"
@@ -154,7 +154,7 @@ def example_5_chained_analysis() -> None:
     print("\nData with chained analysis:")
     print(f"Columns: {list(df.columns)}")
     print("\nFirst 10 rows:")
-    print(df[["Period", "value", "yoy_growth", "moving_avg"]].head(10))
+    print(df[["period", "value", "yoy_growth", "moving_avg"]].head(10))
 
     # Save to CSV
     output_file = "gdp_chained_analysis.csv"
@@ -188,7 +188,7 @@ def example_6_multiple_window_sizes() -> None:
     print("\nComparison of different window sizes:")
     for window, df in results.items():
         print(f"\nWindow {window}:")
-        print(df[["Period", "value", "moving_avg"]].head(5))
+        print(df[["period", "value", "moving_avg"]].head(5))
 
 
 def example_7_trend_analysis() -> None:
@@ -213,10 +213,10 @@ def example_7_trend_analysis() -> None:
     ma_df = ma_result.to_dataframe()
 
     print("\nYear-over-Year Growth Trends:")
-    print(yoy_df[["Period", "value", "yoy_growth"]].tail(10))
+    print(yoy_df[["period", "value", "yoy_growth"]].tail(10))
 
     print("\n5-Period Moving Average Trends:")
-    print(ma_df[["Period", "value", "moving_avg"]].tail(10))
+    print(ma_df[["period", "value", "moving_avg"]].tail(10))
 
 
 def example_8_volatility_analysis() -> None:
@@ -244,7 +244,7 @@ def example_8_volatility_analysis() -> None:
     print(f"Min MoM change: {df['mom_change'].min():.2f}%")
 
     print("\nRecent MoM changes:")
-    print(df[["Period", "value", "mom_change"]].tail(10))
+    print(df[["period", "value", "mom_change"]].tail(10))
 
 
 def example_9_smoothing_comparison() -> None:
@@ -274,12 +274,12 @@ def example_9_smoothing_comparison() -> None:
     print("-" * 50)
 
     # Merge data for comparison
-    comparison_df = sma_df[["Period", "value", "moving_avg"]].copy()
+    comparison_df = sma_df[["period", "value", "moving_avg"]].copy()
     comparison_df["exp_moving_avg"] = ema_df["exp_moving_avg"]
 
     for _, row in comparison_df.tail(10).iterrows():
         print(
-            f"{row['Period']} | {row['value']:.2f} | "
+            f"{row['period']} | {row['value']:.2f} | "
             f"{row['moving_avg']:.2f} | {row['exp_moving_avg']:.2f}"
         )
 
@@ -315,7 +315,7 @@ def example_10_comprehensive_analysis() -> None:
     print(f"Columns: {list(df.columns)}")
     print("\nRecent data (last 10 periods):")
     print(
-        df[["Period", "value", "yoy_growth", "mom_change", "moving_avg", "exp_moving_avg"]].tail(10)
+        df[["period", "value", "yoy_growth", "mom_change", "moving_avg", "exp_moving_avg"]].tail(10)
     )
 
     # Summary statistics

@@ -13,9 +13,14 @@ class DimensionValue(BaseModel):
     along a particular dimension (e.g., a specific year, region, or category).
     """
 
-    code: str = Field(..., description="Dimension value code")
-    label: str = Field(..., description="Human-readable label")
+    code: str = Field(..., description="Code to filter by (INE's cat_id, e.g. 'S7A2022' or 'H1')")
+    label: str = Field(..., description="Human-readable label (in the request language)")
     order: Optional[int] = Field(None, description="Display order")
+    categ_cod: Optional[str] = Field(
+        default=None,
+        description="INE's categ_cod. Usually equal to code; where it differs (e.g. 'H.1' for "
+        "'H1'), INE refuses it as a filter.",
+    )
 
 
 class Dimension(BaseModel):

@@ -20,10 +20,10 @@ def sample_response():
         title="Population Data",
         language="EN",
         data=[
-            {"Period": "2020", "value": 100},
-            {"Period": "2021", "value": 110},
-            {"Period": "2022", "value": 120},
-            {"Period": "2023", "value": 132},
+            {"period": "2020", "period_code": "S7A2020", "value": 100},
+            {"period": "2021", "period_code": "S7A2021", "value": 110},
+            {"period": "2022", "period_code": "S7A2022", "value": 120},
+            {"period": "2023", "period_code": "S7A2023", "value": 132},
         ],
         unit="No.",
     )
@@ -37,12 +37,12 @@ def sample_response_multiregion():
         title="Regional Population",
         language="EN",
         data=[
-            {"Period": "2020", "value": 100, "region": "North"},
-            {"Period": "2020", "value": 150, "region": "South"},
-            {"Period": "2021", "value": 110, "region": "North"},
-            {"Period": "2021", "value": 160, "region": "South"},
-            {"Period": "2022", "value": 120, "region": "North"},
-            {"Period": "2022", "value": 170, "region": "South"},
+            {"period": "2020", "period_code": "S7A2020", "value": 100, "region": "North"},
+            {"period": "2020", "period_code": "S7A2020", "value": 150, "region": "South"},
+            {"period": "2021", "period_code": "S7A2021", "value": 110, "region": "North"},
+            {"period": "2021", "period_code": "S7A2021", "value": 160, "region": "South"},
+            {"period": "2022", "period_code": "S7A2022", "value": 120, "region": "North"},
+            {"period": "2022", "period_code": "S7A2022", "value": 170, "region": "South"},
         ],
         unit="No.",
     )
@@ -206,7 +206,7 @@ class TestPlotCustomization:
     def test_plot_custom_columns(self, sample_response):
         """Test plot with custom column names."""
         fig = sample_response.plot(
-            x_column="Period",
+            x_column="period",
             y_column="value",
         )
 

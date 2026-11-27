@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 def plot_indicator(
     data: Union[list[dict[str, Any]], "pd.DataFrame"],
     title: str = "Indicator Data",
-    x_column: str = "Period",
+    x_column: str = "period",
     y_column: str = "value",
     chart_type: str = "line",
     color_column: Optional[str] = None,
@@ -37,7 +37,7 @@ def plot_indicator(
     Args:
         data: List of dictionaries or pandas DataFrame with indicator data
         title: Chart title
-        x_column: Column name for x-axis (default: "Period")
+        x_column: Column name for x-axis (default: "period")
         y_column: Column name for y-axis values (default: "value")
         chart_type: Type of chart - "line", "bar", "area", "scatter" (default: "line")
         color_column: Optional column to use for coloring by dimension
@@ -51,7 +51,7 @@ def plot_indicator(
         ValueError: If chart_type is invalid
 
     Example:
-        >>> data = [{"Period": "2021", "value": 100}, {"Period": "2022", "value": 110}]
+        >>> data = [{"period": "2021", "value": 100}, {"period": "2022", "value": 110}]
         >>> fig = plot_indicator(data, title="Population Growth", chart_type="line")
         >>> fig.show()
     """
@@ -119,7 +119,7 @@ def plot_indicator(
 def plot_line_chart(
     data: Union[list[dict[str, Any]], "pd.DataFrame"],
     title: str = "Line Chart",
-    x_column: str = "Period",
+    x_column: str = "period",
     y_column: str = "value",
     color_column: Optional[str] = None,
     markers: bool = True,
@@ -175,7 +175,7 @@ def plot_line_chart(
 def plot_bar_chart(
     data: Union[list[dict[str, Any]], "pd.DataFrame"],
     title: str = "Bar Chart",
-    x_column: str = "Period",
+    x_column: str = "period",
     y_column: str = "value",
     color_column: Optional[str] = None,
     **kwargs: Any,
@@ -228,7 +228,7 @@ def plot_bar_chart(
 def plot_area_chart(
     data: Union[list[dict[str, Any]], "pd.DataFrame"],
     title: str = "Area Chart",
-    x_column: str = "Period",
+    x_column: str = "period",
     y_column: str = "value",
     color_column: Optional[str] = None,
     **kwargs: Any,
@@ -281,7 +281,7 @@ def plot_area_chart(
 def plot_scatter_chart(
     data: Union[list[dict[str, Any]], "pd.DataFrame"],
     title: str = "Scatter Chart",
-    x_column: str = "Period",
+    x_column: str = "period",
     y_column: str = "value",
     color_column: Optional[str] = None,
     size_column: Optional[str] = None,

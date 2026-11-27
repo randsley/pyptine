@@ -98,7 +98,7 @@ async def example_5_streaming_large_dataset() -> None:
         chunk_count = 0
 
         # Stream large dataset in chunks
-        async for chunk in ine.get_all_data("0004127", chunk_size=10000):
+        async for chunk in ine.get_all_data("0004127", periods_per_request=5):
             chunk_count += 1
             df_chunk = chunk.to_dataframe()
             total_rows += len(df_chunk)

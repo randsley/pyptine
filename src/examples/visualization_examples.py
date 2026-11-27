@@ -82,7 +82,7 @@ def example_3_bar_chart() -> None:
     # Customize
     fig.update_layout(
         title="Unemployment Rate",
-        xaxis_title="Period",
+        xaxis_title="period",
         yaxis_title="Rate (%)",
     )
 
@@ -111,7 +111,7 @@ def example_4_area_chart() -> None:
     # Customize
     fig.update_layout(
         title="GDP Over Time (Area Chart)",
-        xaxis_title="Period",
+        xaxis_title="period",
         yaxis_title="GDP Value",
         hovermode="x unified",
     )
@@ -193,7 +193,7 @@ def example_7_custom_columns() -> None:
 
     # Create chart with specific columns
     print("Creating chart with custom columns...")
-    fig = response.plot_line(x_column="Period", y_column="value")
+    fig = response.plot_line(x_column="period", y_column="value")
 
     # Save to file
     output_file = "custom_columns_chart.html"

@@ -13,10 +13,10 @@ def sample_response():
         title="Test Indicator",
         language="EN",
         data=[
-            {"Period": "2020", "value": 100, "region": "PT"},
-            {"Period": "2021", "value": 110, "region": "PT"},
-            {"Period": "2022", "value": 120, "region": "PT"},
-            {"Period": "2023", "value": 132, "region": "PT"},
+            {"period_code": "2020", "value": 100, "region": "PT"},
+            {"period_code": "2021", "value": 110, "region": "PT"},
+            {"period_code": "2022", "value": 120, "region": "PT"},
+            {"period_code": "2023", "value": 132, "region": "PT"},
         ],
         unit="No.",
     )
@@ -30,12 +30,12 @@ def sample_monthly_response():
         title="Monthly Data",
         language="EN",
         data=[
-            {"Period": "2023-01", "value": 100},
-            {"Period": "2023-02", "value": 105},
-            {"Period": "2023-03", "value": 110},
-            {"Period": "2023-04", "value": 108},
-            {"Period": "2023-05", "value": 115},
-            {"Period": "2023-06", "value": 125},
+            {"period_code": "2023-01", "value": 100},
+            {"period_code": "2023-02", "value": 105},
+            {"period_code": "2023-03", "value": 110},
+            {"period_code": "2023-04", "value": 108},
+            {"period_code": "2023-05", "value": 115},
+            {"period_code": "2023-06", "value": 125},
         ],
         unit="No.",
     )
@@ -72,7 +72,9 @@ class TestDataResponseYoYGrowth:
 
     def test_yoy_growth_custom_columns(self, sample_response):
         """Test YoY growth with custom column names."""
-        result = sample_response.calculate_yoy_growth(value_column="value", period_column="Period")
+        result = sample_response.calculate_yoy_growth(
+            value_column="value", period_column="period_code"
+        )
 
         assert "yoy_growth" in result.data[0]
         df = result.to_dataframe()
@@ -204,4 +206,4 @@ class TestChainedAnalysis:
 
         assert len(df) == len(sample_response.data)
         assert "yoy_growth" in df.columns
-        assert "Period" in df.columns
+        assert "period_code" in df.columns

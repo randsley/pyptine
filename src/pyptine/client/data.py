@@ -1,14 +1,17 @@
 """Data client for INE Portugal API."""
 
 import logging
+import warnings
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Optional, Union, cast
 
+from pyptine.client import parsing
 from pyptine.client.base import INEClient
-from pyptine.client.metadata import MetadataClient  # Import MetadataClient
+from pyptine.client.metadata import MetadataClient
+from pyptine.client.parsing import DimensionFilters
+from pyptine.models.indicator import IndicatorMetadata
 from pyptine.models.response import DataResponse
-from pyptine.utils.exceptions import DataProcessingError, DimensionError
 
 logger = logging.getLogger(__name__)
 
@@ -16,17 +19,20 @@ logger = logging.getLogger(__name__)
 class DataClient(INEClient):
     """Client for INE data API endpoint.
 
-    Fetches and parses indicator data with support for dimension filtering
-    and pagination for large datasets.
+    Fetches and parses indicator data. Every row carries ``period`` (INE's label, e.g. "2022")
+    and ``period_code`` (the code used to filter, e.g. "S7A2022").
+
+    INE returns only the **latest period** when no period (``Dim1``) is given. Ask for several
+    periods with a list or a comma-separated ``Dim1``, or use :meth:`get_all_data`.
 
     Example:
         >>> client = DataClient(language="EN")
-        >>> response = client.get_data("0004167")
+        >>> response = client.get_data("0008273", dimensions={"Dim1": ["S7A2021", "S7A2022"]})
         >>> df = response.to_dataframe()
     """
 
     DATA_ENDPOINT = "/ine/json_indicador/pindica.jsp"
-    DEFAULT_PAGE_SIZE = 40000  # API limit for data points per request
+    DEFAULT_PERIODS_PER_REQUEST = 10
 
     def __init__(
         self,
@@ -34,362 +40,148 @@ class DataClient(INEClient):
         timeout: int = 30,
         cache_enabled: bool = True,
         cache_dir: Optional[Path] = None,
-        metadata_client: Optional[MetadataClient] = None,  # New parameter
+        metadata_client: Optional[MetadataClient] = None,
     ):
         super().__init__(language, timeout, cache_enabled, cache_dir)
+        if metadata_client is None:
+            metadata_client = MetadataClient(language, timeout, cache_enabled, cache_dir)
+        elif getattr(metadata_client, "language", self.language) != self.language:
+            # Period labels are matched to codes through the metadata, in the same language.
+            raise ValueError(
+                f"metadata_client language {metadata_client.language} differs from the data "
+                f"client's {self.language}"
+            )
         self.metadata_client = metadata_client
+
+    def _metadata(self, varcd: str) -> IndicatorMetadata:
+        return self.metadata_client.get_metadata(varcd)
 
     def get_data(
         self,
         varcd: str,
-        dimensions: Optional[dict[str, str]] = None,
+        dimensions: Optional[DimensionFilters] = None,
     ) -> DataResponse:
         """Fetch indicator data with optional dimension filters.
 
         Args:
-            varcd: Indicator code (e.g., "0004167")
-            dimensions: Optional dimension filters (e.g., {"Dim1": "2023", "Dim2": "1"})
+            varcd: Indicator code (e.g., "0008273")
+            dimensions: Optional filters by dimension. Each value is one code, a list of codes
+                or a comma-separated string. Codes are ``DimensionValue.code`` from
+                :meth:`MetadataClient.get_dimensions` (INE's cat_id), e.g.
+                ``{"Dim1": ["S7A2021", "S7A2022"], "Dim2": "PT"}``. Without ``Dim1``, INE
+                returns only the latest period.
 
         Returns:
-            DataResponse object with indicator data
+            DataResponse whose rows carry ``period``, ``period_code`` and ``value``
 
         Raises:
-            DimensionError: If dimension filters are invalid
-            DataProcessingError: If response parsing fails
-
-        Example:
-            >>> client = DataClient()
-            >>> # Get all data
-            >>> response = client.get_data("0004167")
-            >>> # Get filtered data
-            >>> response = client.get_data(
-            ...     "0004167",
-            ...     dimensions={"Dim1": "2023", "Dim2": "1"}
-            ... )
-            >>> df = response.to_dataframe()
+            DimensionError: If a dimension key or code is not valid for the indicator
+            INERefusalError: If INE refused the request
+            DataProcessingError: If the response cannot be parsed
         """
         logger.info(f"Fetching data for indicator {varcd}")
-
         params = self._build_params(varcd, dimensions)
-
-        try:
-            raw_response = self._make_request(
-                self.DATA_ENDPOINT, params=params, response_format="json"
-            )
-
-            # Parse response
-            data_response = self._parse_data_response(
-                varcd, cast(Union[dict[str, Any], list[dict[str, Any]]], raw_response)
-            )
-
-            logger.info(f"Retrieved {len(data_response.data)} data points for {varcd}")
-
-            return data_response
-
-        except Exception as e:
-            logger.error(f"Failed to get data for {varcd}: {str(e)}")
-            raise
+        raw_response = self._make_request(self.DATA_ENDPOINT, params=params, response_format="json")
+        data_response = self._parse_data_response(
+            varcd, cast(Union[dict[str, Any], list[dict[str, Any]]], raw_response)
+        )
+        logger.info(f"Retrieved {len(data_response.data)} data points for {varcd}")
+        return data_response
 
     def get_all_data(
         self,
         varcd: str,
-        dimensions: Optional[dict[str, str]] = None,
-        chunk_size: int = DEFAULT_PAGE_SIZE,
+        dimensions: Optional[DimensionFilters] = None,
+        periods_per_request: int = DEFAULT_PERIODS_PER_REQUEST,
+        chunk_size: Optional[int] = None,
     ) -> Iterator[DataResponse]:
-        """Fetch all data for a given indicator with pagination support.
+        """Fetch every period of an indicator, a batch of periods per request.
 
-        Implements chunked data fetching to handle large datasets efficiently.
-        The INE API returns data in chunks; this method automatically handles
-        pagination by fetching subsequent chunks until all data is retrieved.
+        INE has no row pagination (it ignores ``start``/``count``) and returns only the latest
+        period when no period is given. This method asks for the periods themselves: all of
+        the indicator's periods, or those given in ``dimensions["Dim1"]``, in batches of
+        ``periods_per_request`` (one comma-separated ``Dim1`` per request).
 
         Args:
             varcd: Indicator code
-            dimensions: Optional dimension filters
-            chunk_size: Number of data points per chunk (default: 40,000)
+            dimensions: Optional filters, as for :meth:`get_data`
+            periods_per_request: Periods per request (lower it for indicators with many rows
+                per period; INE's gateway gives up after 120 s)
+            chunk_size: Deprecated and ignored (INE does not paginate rows)
 
         Yields:
-            DataResponse objects, one per chunk. Each chunk contains up to
-            chunk_size data points.
+            One DataResponse per batch of periods, oldest first
 
         Example:
             >>> client = DataClient()
-            >>> for chunk in client.get_all_data("0004167"):
-            ...     df = chunk.to_dataframe()
-            ...     print(f"Processed {len(df)} rows")
-            >>> # Or collect all chunks
-            >>> all_chunks = list(client.get_all_data("0004167"))
-            >>> total_points = sum(len(chunk.data) for chunk in all_chunks)
+            >>> chunks = list(client.get_all_data("0008273", dimensions={"Dim2": "PT"}))
+            >>> rows = [row for chunk in chunks for row in chunk.data]
         """
-        logger.info(f"Fetching all data for indicator {varcd} with chunk_size={chunk_size}")
+        if chunk_size is not None:
+            warnings.warn(
+                "chunk_size is ignored: INE does not paginate rows. get_all_data now fetches "
+                "periods in batches (periods_per_request).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        for batch_dims in self._period_batches(varcd, dimensions, periods_per_request):
+            yield self.get_data(varcd, batch_dims)
 
-        offset = 0
-        total_fetched = 0
-        chunk_count = 0
-
-        while True:
-            chunk_count += 1
-            logger.debug(f"Fetching chunk {chunk_count} with offset={offset}")
-
-            params = self._build_params(varcd, dimensions, offset=offset, limit=chunk_size)
-
-            try:
-                raw_response = self._make_request(
-                    self.DATA_ENDPOINT, params=params, response_format="json"
-                )
-
-                # Parse response
-                data_response = self._parse_data_response(
-                    varcd, cast(Union[dict[str, Any], list[dict[str, Any]]], raw_response)
-                )
-
-                chunk_size_received = len(data_response.data)
-                total_fetched += chunk_size_received
-
-                logger.info(
-                    f"Chunk {chunk_count}: Retrieved {chunk_size_received} data points "
-                    f"(total so far: {total_fetched})"
-                )
-
-                yield data_response
-
-                # If we received fewer data points than requested, we've reached the end
-                if chunk_size_received < chunk_size:
-                    logger.info(f"Completed fetch for {varcd}: total {total_fetched} data points")
-                    break
-
-                offset += chunk_size
-
-            except Exception as e:
-                logger.error(f"Failed to fetch chunk {chunk_count} for {varcd}: {str(e)}")
-                raise
+    def _period_batches(
+        self,
+        varcd: str,
+        dimensions: Optional[DimensionFilters],
+        periods_per_request: int,
+    ) -> Iterator[DimensionFilters]:
+        if periods_per_request < 1:
+            raise ValueError(f"periods_per_request must be at least 1, got {periods_per_request}")
+        dims: DimensionFilters = dict(dimensions or {})
+        if "Dim1" in dims:
+            periods = parsing.split_codes(dims["Dim1"])
+        else:
+            periods = parsing.period_codes(self._metadata(varcd))
+        for i in range(0, len(periods), periods_per_request):
+            yield {**dims, "Dim1": periods[i : i + periods_per_request]}
 
     def _build_params(
         self,
         varcd: str,
-        dimensions: Optional[dict[str, str]] = None,
-        offset: Optional[int] = None,
-        limit: Optional[int] = None,
+        dimensions: Optional[DimensionFilters] = None,
     ) -> dict[str, str]:
-        """Build query parameters for data API request.
-
-        Args:
-            varcd: Indicator code
-            dimensions: Optional dimension filters
-            offset: Starting offset for pagination (0-based)
-            limit: Maximum number of records to return
-
-        Returns:
-            Dictionary of query parameters
+        """Build query parameters for a data request, validating the dimension filters.
 
         Raises:
-            DimensionError: If dimension keys or values are invalid
-
-        Example:
-            >>> params = client._build_params("0004167")
-            >>> params = client._build_params("0004167", dimensions={"Dim1": "2023"})
-            >>> params = client._build_params("0004167", offset=0, limit=1000)
+            DimensionError: If dimension keys or codes are invalid
         """
-        params = {
-            "op": "2",  # Operation code for data retrieval
-            "varcd": varcd,
-        }
-
-        # Add pagination parameters if provided
-        if offset is not None:
-            params["start"] = str(offset)
-        if limit is not None:
-            params["count"] = str(limit)
-
-        # Validate dimensions before building params
+        params = {"op": "2", "varcd": varcd}
         if dimensions:
-            self.validate_dimensions(varcd, dimensions)
-            for key, value in dimensions.items():
-                params[key] = str(value)
-
+            params.update(parsing.normalise_dimensions(varcd, dimensions, self._metadata(varcd)))
         return params
 
     def _parse_data_response(
         self, varcd: str, response: Union[dict[str, Any], list[dict[str, Any]]]
     ) -> DataResponse:
-        """Parse data API response into DataResponse model.
+        """Parse a data API response (see :func:`pyptine.client.parsing.parse_data_response`)."""
+        return parsing.parse_data_response(
+            varcd, response, self.language, lambda: self._metadata(varcd)
+        )
 
-        Args:
-            varcd: Indicator code (used if response is a list)
-            response: Raw JSON response from API (can be dict or list)
+    def _process_data_point(self, data_point: dict[str, Any]) -> dict[str, Any]:
+        """Process a single data row (see :func:`pyptine.client.parsing.process_data_point`)."""
+        return parsing.process_data_point(data_point)
 
-        Returns:
-            Parsed DataResponse object
-
-        Raises:
-            DataProcessingError: If parsing fails
-        """
-        try:
-            varcd_val = varcd
-            title = ""
-            language = self.language
-            unit = None
-            data_array = []
-
-            if isinstance(response, list):
-                # New API format: response is a list with a single dict
-                if len(response) == 1 and isinstance(response[0], dict):
-                    response = response[0]
-                elif len(response) > 1:
-                    # Old format: response is directly the data array
-                    data_array = response
-                    # Fetch metadata separately to get title and unit
-                    if self.metadata_client:
-                        try:
-                            metadata = self.metadata_client.get_metadata(varcd)
-                            title = metadata.title
-                            unit = metadata.unit
-                        except Exception as e:
-                            logger.warning(
-                                f"Could not fetch metadata for {varcd} when parsing list data response: {e}"
-                            )
-                    else:
-                        logger.warning(
-                            "MetadataClient not available in DataClient to fetch indicator name and unit."
-                        )
-
-                    if not title and data_array:
-                        # Fallback: try to get unit from first data point if metadata not available
-                        first_point = data_array[0]
-                        unit = first_point.get("unidade") or first_point.get("unit")
-
-            if isinstance(response, dict):
-                # Support both old and new API formats
-                # New format uses PascalCase field names
-                varcd_val = response.get("IndicadorCod") or response.get("indicador", varcd)
-                title = (
-                    response.get("IndicadorDsg")
-                    or response.get("IndicadorNome")
-                    or response.get("nome", "")
-                )
-                language = response.get("Lingua") or response.get("lang", self.language)
-                unit = response.get("UnidadeMedida") or response.get("unidade")
-
-                # Handle both old and new data array formats
-                # Old format: "dados" is a flat array
-                # New format: "Dados" is an object with years as keys
-                dados = response.get("Dados") or response.get("dados")
-                if isinstance(dados, dict):
-                    # New format: flatten all years into a single array
-                    data_array = []
-                    for year_data in dados.values():
-                        if isinstance(year_data, list):
-                            data_array.extend(year_data)
-                elif isinstance(dados, list):
-                    # Old format: already a flat array
-                    data_array = dados
-                else:
-                    data_array = []
-
-            # Process data points
-            processed_data = []
-            for data_point in data_array:
-                processed_point = self._process_data_point(data_point)
-                if processed_point:
-                    processed_data.append(processed_point)
-
-            # If unit is still None and we have metadata_client, fetch from metadata
-            if unit is None and self.metadata_client:
-                try:
-                    metadata = self.metadata_client.get_metadata(varcd)
-                    unit = metadata.unit
-                    # Also update title if it's empty
-                    if not title:
-                        title = metadata.title
-                except Exception as e:
-                    logger.debug(f"Could not fetch unit from metadata for {varcd}: {e}")
-
-            return DataResponse(
-                varcd=varcd_val,
-                title=title,
-                language=language,
-                data=processed_data,
-                unit=unit,
-            )
-
-        except Exception as e:
-            logger.error(f"Failed to parse data response: {str(e)}")
-            raise DataProcessingError(f"Failed to parse data: {str(e)}") from e
-
-    def _process_data_point(self, data_point: dict[str, Any]) -> Optional[dict[str, Any]]:
-        """Process a single data point from the API response.
-
-        Args:
-            data_point: Raw data point dictionary
-
-        Returns:
-            Processed data point dictionary or None if invalid
-        """
-        try:
-            processed = {}
-
-            # Iterate through all fields in the data point
-            for key, value in data_point.items():
-                # Skip internal fields
-                if key.startswith("_"):
-                    continue
-
-                # Handle value field specially (convert to float)
-                if key == "valor" or key == "value":
-                    try:
-                        processed["value"] = float(value) if value is not None else None
-                    except (ValueError, TypeError) as e:
-                        logger.warning(
-                            f"Could not convert value '{value}' for key '{key}' to float in data point {data_point}. "
-                            f"Setting to None. Error: {e}"
-                        )
-                        processed["value"] = None
-                else:
-                    # Keep other fields as-is
-                    processed[key] = value
-
-            return processed
-
-        except Exception as e:
-            logger.warning(f"Failed to process data point {data_point}: {str(e)}")
-            return None
-
-    def validate_dimensions(self, varcd: str, dimensions: dict[str, str]) -> bool:
+    def validate_dimensions(self, varcd: str, dimensions: DimensionFilters) -> bool:
         """Validate dimension filters against indicator metadata.
 
-        This method checks if the provided dimension codes and values are valid
-        for the indicator.
-
-        Args:
-            varcd: Indicator code
-            dimensions: Dimension filters to validate (e.g., {"Dim1": "2023"})
+        Codes are INE's cat_id (``DimensionValue.code``); a value may be a list or a
+        comma-separated string of codes.
 
         Returns:
             True if dimensions are valid
 
         Raises:
-            DimensionError: If metadata client is not available, or if any
-                            dimension key or value is invalid.
+            DimensionError: If any dimension key or code is invalid. The message names the
+                code to use when the given one is a label or a categ_cod.
         """
-        if not self.metadata_client:
-            raise DimensionError("MetadataClient not available for dimension validation.")
-
-        metadata = self.metadata_client.get_metadata(varcd)
-        available_dimensions = {f"Dim{d.id}": d for d in metadata.dimensions}
-
-        for dim_key, dim_value in dimensions.items():
-            if dim_key not in available_dimensions:
-                raise DimensionError(
-                    f"Invalid dimension key '{dim_key}' for indicator {varcd}. "
-                    f"Available keys: {list(available_dimensions.keys())}"
-                )
-
-            dimension = available_dimensions[dim_key]
-            valid_values = {val.code for val in dimension.values}
-
-            if dim_value not in valid_values:
-                raise DimensionError(
-                    f"Invalid value '{dim_value}' for dimension '{dim_key}' "
-                    f"of indicator {varcd}. Available values: {list(valid_values)}"
-                )
-
+        parsing.normalise_dimensions(varcd, dimensions, self._metadata(varcd))
         return True

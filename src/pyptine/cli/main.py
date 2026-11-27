@@ -249,7 +249,7 @@ def info(varcd: str, lang: str) -> None:
     "--dimension",
     "-d",
     multiple=True,
-    help="Filter by dimension (format: Dim1=value)",
+    help="Filter by dimension: Dim1=S7A2022, or several codes Dim1=S7A2021,S7A2022 (codes from `pyptine dimensions`)",
 )
 @handle_exceptions
 def download(
@@ -267,7 +267,7 @@ def download(
         pyptine download 0004167
         pyptine download 0004167 --output data.csv
         pyptine download 0004167 --format json
-        pyptine download 0004167 --dimension "Dim1=2020"
+        pyptine download 0008273 --dimension "Dim1=S7A2021,S7A2022" -d Dim2=PT
     """
     ine = INE(language=lang, cache=True)
 

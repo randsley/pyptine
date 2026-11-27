@@ -41,7 +41,7 @@ echo -e "\n# 9. Download data as a JSON file"
 pyptine download 0004167 --output population_data.json --output-format json
 
 echo -e "\n# 10. Download data with a dimension filter"
-pyptine download 0004167 --output filtered_population_data.csv --dimension "Dim1=2023"
+pyptine download 0004167 --output filtered_population_data.csv --dimension "Dim1=S7A2023"
 
 # --- Cache Management ---
 echo -e "\n# 11. View cache information"

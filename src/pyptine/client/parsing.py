@@ -1,0 +1,298 @@
+"""Parsing and validation shared by the sync and async INE clients.
+
+Facts this module relies on, verified against the live API on 2026-11-27 and pinned in tests
+against the recorded responses in tests/fixtures/ine/:
+
+- Every JSON response is a one-element array around an object.
+- INE refuses with HTTP 200 and ``{"Sucesso": {"Falso": [{"Msg", "Cod"}]}}``.
+- ``Dados`` maps the period *label* ("2022", "1st Quarter 2026") to its rows. Rows carry no
+  period field. ``Dim1`` takes the period *code* ("S7A2022"), the dimension's ``cat_id``.
+- Dimension filters take ``cat_id``, not ``categ_cod`` (0012234 Dim3: "H1", not "H.1").
+- Several codes go as one comma-separated value ("S7A2021,S7A2022"). Unfiltered, only the
+  latest period is returned. ``start``/``count`` are ignored.
+"""
+
+import logging
+import re
+from collections.abc import Mapping, Sequence
+from typing import Any, Callable, Optional, Union
+
+from pyptine.models.indicator import Dimension, IndicatorMetadata
+from pyptine.models.response import DataResponse
+from pyptine.utils.exceptions import DataProcessingError, DimensionError, INERefusalError
+
+logger = logging.getLogger(__name__)
+
+#: A dimension filter value: one code, a comma-separated string of codes, or a list of codes.
+DimensionValueFilter = Union[str, Sequence[str]]
+DimensionFilters = Mapping[str, DimensionValueFilter]
+
+# A refusal's key as INE writes it ('"Falso" : ['). A label "Falso" is never followed by a colon.
+_REFUSAL = re.compile(rb'"Falso"\s*:')
+
+# Markers INE uses in `valor` for suppressed or unavailable figures.
+_SUPPRESSION_MARKERS = {"", "-", "x", "//", "...", "..", "§", "o"}
+
+
+def is_refusal_body(content: bytes) -> bool:
+    """True if a raw response body is an INE refusal (used to keep refusals out of the cache)."""
+    return bool(_REFUSAL.search(content))
+
+
+def check_success(body: Any, varcd: str = "", url: str = "") -> None:
+    """Raise INERefusalError if INE refused the request.
+
+    Args:
+        body: Parsed JSON body (INE's one-element array, or the object inside it)
+        varcd: Indicator code of the request, for the message
+        url: Request URL, for the message
+
+    Raises:
+        INERefusalError: If the body carries ``Sucesso.Falso``
+    """
+    obj = body[0] if isinstance(body, list) and len(body) == 1 else body
+    if not isinstance(obj, dict):
+        return
+    falso = (
+        (obj.get("Sucesso") or {}).get("Falso") if isinstance(obj.get("Sucesso"), dict) else None
+    )
+    if falso:
+        first = falso[0] if isinstance(falso, list) and falso else {}
+        raise INERefusalError(
+            varcd=str(first.get("IndicadorCod") or varcd),
+            ine_code=str(first.get("Cod", "")),
+            ine_message=str(first.get("Msg", "")),
+            url=url,
+        )
+
+
+def split_codes(value: DimensionValueFilter) -> list[str]:
+    """Split a filter value into codes: "a,b" or ["a", "b"] -> ["a", "b"]."""
+    if isinstance(value, str):
+        codes = value.split(",")
+    elif isinstance(value, Sequence):
+        codes = [str(v) for v in value]
+    else:
+        codes = [str(value)]
+    return [c.strip() for c in codes]
+
+
+def _dimension_map(metadata: IndicatorMetadata) -> dict[str, Dimension]:
+    return {f"Dim{d.id}": d for d in metadata.dimensions}
+
+
+def _invalid_value_message(varcd: str, key: str, code: str, dim: Dimension) -> str:
+    msg = f"Invalid value '{code}' for dimension '{key}' of indicator {varcd}."
+    by_categ = [v for v in dim.values if v.categ_cod == code and v.code != code]
+    by_label = [v for v in dim.values if v.label == code]
+    if len(by_categ) == 1:
+        msg += (
+            f" '{code}' is the categ_cod of '{by_categ[0].code}'; INE filters by cat_id, "
+            f"so use '{by_categ[0].code}'."
+        )
+    elif len(by_label) == 1:
+        msg += f" '{code}' is the label of '{by_label[0].code}': use the code '{by_label[0].code}'."
+    valid = [v.code for v in dim.values]
+    shown = ", ".join(valid[:12]) + (", ..." if len(valid) > 12 else "")
+    return msg + f" Valid codes ({len(valid)}): {shown}"
+
+
+def normalise_dimensions(
+    varcd: str, dimensions: DimensionFilters, metadata: IndicatorMetadata
+) -> dict[str, str]:
+    """Validate dimension filters against the indicator's metadata.
+
+    Each value may be one code, a comma-separated string or a list of codes. Codes are the
+    dimension's ``cat_id`` values (``DimensionValue.code``).
+
+    Returns:
+        The filters as INE takes them: one comma-separated string per dimension
+
+    Raises:
+        DimensionError: For an unknown dimension key, an empty value, or a code that is not
+            valid for the dimension (the message names the code to use when the given one is a
+            label or a ``categ_cod``)
+    """
+    available = _dimension_map(metadata)
+    out: dict[str, str] = {}
+    for key, value in dimensions.items():
+        if key not in available:
+            raise DimensionError(
+                f"Invalid dimension key '{key}' for indicator {varcd}. "
+                f"Available keys: {list(available.keys())}"
+            )
+        codes = split_codes(value)
+        if not codes or any(c == "" for c in codes):
+            raise DimensionError(
+                f"Empty code in dimension '{key}' for indicator {varcd}: {value!r}"
+            )
+        dim = available[key]
+        valid = {v.code for v in dim.values}
+        for code in codes:
+            if code not in valid:
+                raise DimensionError(_invalid_value_message(varcd, key, code, dim))
+        out[key] = ",".join(codes)
+    return out
+
+
+def period_codes(metadata: IndicatorMetadata) -> list[str]:
+    """Every period code (Dim1 cat_id) of an indicator, oldest first."""
+    dim = _dimension_map(metadata).get("Dim1")
+    if dim is None or not dim.values:
+        raise DataProcessingError(f"Metadata for {metadata.varcd} lists no periods (Dim1)")
+    return [v.code for v in sorted(dim.values, key=lambda v: (v.order or 0, v.code))]
+
+
+def _period_lookup(metadata: IndicatorMetadata) -> dict[str, str]:
+    """Period label -> period code, from Dim1 of the metadata."""
+    dim = _dimension_map(metadata).get("Dim1")
+    if dim is None:
+        raise DataProcessingError(f"Metadata for {metadata.varcd} has no Dim1 (period)")
+    lookup: dict[str, str] = {}
+    for v in dim.values:
+        if v.label in lookup and lookup[v.label] != v.code:
+            raise DataProcessingError(
+                f"Period label {v.label!r} of {metadata.varcd} names two codes "
+                f"({lookup[v.label]}, {v.code}); cannot assign period codes"
+            )
+        lookup[v.label] = v.code
+    return lookup
+
+
+def process_data_point(data_point: dict[str, Any]) -> dict[str, Any]:
+    """Convert one INE data row: ``valor`` becomes the float ``value``; other fields stay.
+
+    ``valor`` is the machine form (decimal point); ``ind_string`` is the localised display form
+    and is kept as is. Suppression markers and nulls become None.
+
+    Raises:
+        DataProcessingError: If the row is not an object
+    """
+    if not isinstance(data_point, dict):
+        raise DataProcessingError(f"Data row is not an object: {data_point!r}")
+    processed: dict[str, Any] = {}
+    for key, value in data_point.items():
+        if key.startswith("_"):
+            continue
+        if key in ("valor", "value"):
+            processed["value"] = _to_float(value)
+        else:
+            processed[key] = value
+    return processed
+
+
+def _to_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if text in _SUPPRESSION_MARKERS:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        logger.warning(f"Unexpected value {value!r} in INE data; recorded as missing")
+        return None
+
+
+def parse_data_response(
+    varcd: str,
+    response: Union[dict[str, Any], list[Any]],
+    language: str,
+    get_metadata: Callable[[], Optional[IndicatorMetadata]],
+) -> DataResponse:
+    """Parse a data response into a DataResponse.
+
+    Each row of INE's ``Dados`` gets ``period`` (INE's label, in the request language) and
+    ``period_code`` (the Dim1 code, e.g. "S7A2022"), taken from the indicator's metadata.
+
+    Args:
+        varcd: Indicator code requested
+        response: Raw JSON body
+        language: Request language
+        get_metadata: Returns the indicator's metadata in the same language (called lazily)
+
+    Raises:
+        INERefusalError: If INE refused the request
+        DataProcessingError: If the response has an unknown shape, or a period label that the
+            metadata does not list
+    """
+    check_success(response, varcd)
+    varcd_val, title, unit = varcd, "", None
+    lang = language
+    rows: list[dict[str, Any]] = []
+    metadata: Optional[IndicatorMetadata] = None
+
+    def meta() -> Optional[IndicatorMetadata]:
+        nonlocal metadata
+        if metadata is None:
+            metadata = get_metadata()
+        return metadata
+
+    try:
+        if isinstance(response, list):
+            if len(response) == 1 and isinstance(response[0], dict):
+                response = response[0]
+            else:
+                # A bare list of rows (an older format; never served by INE since at least
+                # 2026-11-27, kept for compatibility).
+                rows = [process_data_point(p) for p in response]
+                response = {}
+
+        if not isinstance(response, dict):
+            raise DataProcessingError(f"Unexpected data response for {varcd}: {type(response)}")
+
+        if response:
+            varcd_val = response.get("IndicadorCod") or response.get("indicador", varcd)
+            title = (
+                response.get("IndicadorDsg")
+                or response.get("IndicadorNome")
+                or response.get("nome", "")
+            )
+            lang = response.get("Lingua") or response.get("lang", language)
+            unit = response.get("UnidadeMedida") or response.get("unidade")
+            dados = response.get("Dados")
+            if dados is None:
+                dados = response.get("dados")
+            if isinstance(dados, dict):
+                md = meta()
+                if md is None:
+                    raise DataProcessingError(
+                        f"Period codes for {varcd} need its metadata, which is not available"
+                    )
+                lookup = _period_lookup(md)
+                for label, period_rows in dados.items():
+                    code = lookup.get(label)
+                    if code is None:
+                        raise DataProcessingError(
+                            f"INE keyed data for {varcd} by period {label!r}, which the "
+                            f"indicator's metadata ({md.language}) does not list; cannot "
+                            "assign its period code"
+                        )
+                    for row in period_rows:
+                        rows.append(
+                            {"period": label, "period_code": code, **process_data_point(row)}
+                        )
+            elif isinstance(dados, list):
+                # Older flat format (see above).
+                rows = [process_data_point(p) for p in dados]
+            elif dados is not None:
+                raise DataProcessingError(f"Unexpected Dados for {varcd}: {type(dados)}")
+    except (DataProcessingError, INERefusalError):
+        raise
+    except Exception as e:
+        raise DataProcessingError(f"Failed to parse data for {varcd}: {e}") from e
+
+    # The data response carries no unit; the metadata does.
+    if unit is None or not title:
+        try:
+            md = meta()
+        except Exception as e:  # metadata is a fallback here, not required
+            logger.debug(f"Could not fetch metadata for {varcd}: {e}")
+            md = None
+        if md is not None:
+            unit = unit if unit is not None else md.unit
+            title = title or md.title
+
+    return DataResponse(varcd=varcd_val, title=title, language=lang, data=rows, unit=unit)

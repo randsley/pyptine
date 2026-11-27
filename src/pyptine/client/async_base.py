@@ -7,6 +7,7 @@ from typing import Any, Optional, Union
 import httpx
 
 from pyptine.__version__ import __version__
+from pyptine.client.parsing import check_success
 from pyptine.utils.exceptions import APIError, RateLimitError
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,10 @@ class AsyncINEClient:
 
             # Parse response based on format
             if response_format == "json":
-                return self._parse_json_response(response)
+                body = self._parse_json_response(response)
+                # INE refuses with HTTP 200 and Sucesso.Falso; raise instead of returning it.
+                check_success(body, str(params.get("varcd", "")), str(response.url))
+                return body
             elif response_format == "xml":
                 return self._parse_xml_response(response)
             else:
@@ -158,7 +162,7 @@ class AsyncINEClient:
         """
         try:
             data: dict[str, Any] = response.json()
-            logger.debug(f"Parsed JSON response with {len(str(data))} characters")
+            logger.debug("Parsed JSON response of %d bytes", len(response.content))
             return data
         except ValueError as e:
             logger.error(f"Failed to parse JSON response: {str(e)}")

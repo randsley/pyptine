@@ -25,6 +25,31 @@ class APIError(INEError):
         super().__init__(f"API Error {status_code}: {message}")
 
 
+class INERefusalError(APIError):
+    """INE refused the request.
+
+    INE answers a request it cannot serve (an unknown indicator code, a dimension code that is
+    not valid for the indicator) with HTTP 200 and ``{"Sucesso": {"Falso": [{"Msg", "Cod"}]}}``.
+    This error carries INE's own code and message. Cod "1" is an unknown indicator code and
+    Cod "4" an invalid dimension code (observed 2026-11-27).
+
+    Attributes:
+        varcd: Indicator code of the request
+        ine_code: INE's ``Cod`` value
+        ine_message: INE's ``Msg`` value
+        url: Request URL
+    """
+
+    def __init__(self, varcd: str, ine_code: str, ine_message: str, url: str = "") -> None:
+        self.varcd = varcd
+        self.ine_code = ine_code
+        self.ine_message = ine_message
+        self.url = url
+        super().__init__(
+            200, f"INE refused the request for {varcd} (Cod {ine_code}): {ine_message}"
+        )
+
+
 class InvalidIndicatorError(INEError):
     """Indicator code is invalid or not found.
 

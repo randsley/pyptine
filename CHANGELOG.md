@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Fixes found by an audit against the live INE API (2026-11-27). Several change behaviour.
+
+### Changed
+
+- **Data rows carry their period**: every row now has `period` (INE's label, e.g. `"2022"`, `"1st Quarter 2026"`) and `period_code` (e.g. `"S7A2022"`). Before, INE's period key was dropped, so rows from different periods could not be told apart.
+- **INE refusals raise `INERefusalError`** (a subclass of `APIError`) with INE's `ine_code` and `ine_message`. INE answers an unknown indicator or an invalid dimension code with HTTP 200, which pyptine returned as an empty result, and cached. Refusals are no longer cached.
+- **Dimension codes are INE's `cat_id`**: `DimensionValue.code` is the code INE filters by; INE's `categ_cod` is kept in the new `DimensionValue.categ_cod`. They differ for some indicators (0012234: `H1` vs `H.1`), and INE refuses `categ_cod`. Validation errors now name the code to use when given a label (`2022`) or a `categ_cod`.
+- **Several codes per dimension**: a filter value may be a list or a comma-separated string (`{"Dim1": ["S7A2021", "S7A2022"]}`). Without `Dim1`, INE returns only the latest period; this is now documented.
+- **`get_all_data` fetches every period**, a batch of `periods_per_request` periods per request. INE ignores the `start`/`count` parameters it used to send, so it returned the same rows again on every pass and never stopped when they reached `chunk_size`. `chunk_size` is deprecated and ignored. New: `INE.get_all_data`.
+- **Analysis methods** default to `period_column="period_code"` (codes sort chronologically; labels do not) and refuse data with several rows per period (several series). `calculate_yoy_growth` compares each period with the same period one year earlier, not with the previous row. Plot methods default to `x_column="period"`, in period order.
+- `DataClient` and `AsyncDataClient` create their own `MetadataClient` when none is given (period codes come from the metadata), and refuse one in another language.
+- The async client shares the sync client's parsing and validation (`pyptine.client.parsing`).
+
+### Added
+
+- Weekly API-drift check (`tools/check_api.py`, `.github/workflows/api-check.yml`) and offline tests pinned against recorded INE responses (`tests/fixtures/ine/`, `tools/capture_fixtures.py`).
+
 ## [0.3.3] - 2026-03-19
 
 ### Fixed

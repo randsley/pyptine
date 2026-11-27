@@ -54,6 +54,12 @@ class DataResponse(BaseModel):
         default_factory=datetime.now, description="When data was extracted"
     )
 
+    def _chronological(self) -> list[dict[str, Any]]:
+        """Rows ordered by period_code (chronological within an indicator), if present."""
+        if self.data and all("period_code" in row for row in self.data):
+            return sorted(self.data, key=lambda row: str(row["period_code"]))
+        return self.data
+
     def to_dataframe(self) -> "pd.DataFrame":
         """Convert data to pandas DataFrame.
 
@@ -131,7 +137,7 @@ class DataResponse(BaseModel):
     def calculate_yoy_growth(
         self,
         value_column: str = "value",
-        period_column: str = "Period",
+        period_column: str = "period_code",
     ) -> "DataResponse":
         """Calculate year-over-year growth rates.
 
@@ -140,7 +146,7 @@ class DataResponse(BaseModel):
 
         Args:
             value_column: Name of the column containing values (default: "value")
-            period_column: Name of the column containing time period (default: "Period")
+            period_column: Name of the column containing time period (default: "period_code", INE's period code)
 
         Returns:
             New DataResponse with YoY growth calculations added
@@ -152,7 +158,7 @@ class DataResponse(BaseModel):
             >>> response = ine.get_data("0004167")
             >>> yoy_response = response.calculate_yoy_growth()
             >>> df = yoy_response.to_dataframe()
-            >>> print(df[['Period', 'value', 'yoy_growth']].head())
+            >>> print(df[['period', 'value', 'yoy_growth']].head())
         """
         from pyptine.analysis.metrics import calculate_yoy_growth
 
@@ -169,7 +175,7 @@ class DataResponse(BaseModel):
     def calculate_mom_change(
         self,
         value_column: str = "value",
-        period_column: str = "Period",
+        period_column: str = "period_code",
     ) -> "DataResponse":
         """Calculate month-over-month percentage changes.
 
@@ -178,7 +184,7 @@ class DataResponse(BaseModel):
 
         Args:
             value_column: Name of the column containing values (default: "value")
-            period_column: Name of the column containing time period (default: "Period")
+            period_column: Name of the column containing time period (default: "period_code", INE's period code)
 
         Returns:
             New DataResponse with MoM change calculations added
@@ -190,7 +196,7 @@ class DataResponse(BaseModel):
             >>> response = ine.get_data("0004127")
             >>> mom_response = response.calculate_mom_change()
             >>> df = mom_response.to_dataframe()
-            >>> print(df[['Period', 'value', 'mom_change']].head())
+            >>> print(df[['period', 'value', 'mom_change']].head())
         """
         from pyptine.analysis.metrics import calculate_mom_change
 
@@ -208,7 +214,7 @@ class DataResponse(BaseModel):
         self,
         window: int = 3,
         value_column: str = "value",
-        period_column: str = "Period",
+        period_column: str = "period_code",
     ) -> "DataResponse":
         """Calculate simple moving average over a time window.
 
@@ -218,7 +224,7 @@ class DataResponse(BaseModel):
         Args:
             window: Number of periods to include in the moving average (default: 3)
             value_column: Name of the column containing values (default: "value")
-            period_column: Name of the column containing time period (default: "Period")
+            period_column: Name of the column containing time period (default: "period_code", INE's period code)
 
         Returns:
             New DataResponse with moving average calculations added
@@ -231,7 +237,7 @@ class DataResponse(BaseModel):
             >>> response = ine.get_data("0004127")
             >>> ma_response = response.calculate_moving_average(window=12)
             >>> df = ma_response.to_dataframe()
-            >>> print(df[['Period', 'value', 'moving_avg']].head(15))
+            >>> print(df[['period', 'value', 'moving_avg']].head(15))
         """
         from pyptine.analysis.metrics import calculate_moving_average
 
@@ -249,7 +255,7 @@ class DataResponse(BaseModel):
         self,
         span: int = 3,
         value_column: str = "value",
-        period_column: str = "Period",
+        period_column: str = "period_code",
     ) -> "DataResponse":
         """Calculate exponential moving average.
 
@@ -259,7 +265,7 @@ class DataResponse(BaseModel):
         Args:
             span: Span parameter for EMA calculation (default: 3)
             value_column: Name of the column containing values (default: "value")
-            period_column: Name of the column containing time period (default: "Period")
+            period_column: Name of the column containing time period (default: "period_code", INE's period code)
 
         Returns:
             New DataResponse with EMA calculations added
@@ -272,7 +278,7 @@ class DataResponse(BaseModel):
             >>> response = ine.get_data("0004127")
             >>> ema_response = response.calculate_exponential_moving_average(span=10)
             >>> df = ema_response.to_dataframe()
-            >>> print(df[['Period', 'value', 'ema']].head(15))
+            >>> print(df[['period', 'value', 'ema']].head(15))
         """
         from pyptine.analysis.metrics import calculate_exponential_moving_average
 
@@ -291,7 +297,7 @@ class DataResponse(BaseModel):
     def plot(
         self,
         chart_type: str = "line",
-        x_column: str = "Period",
+        x_column: str = "period",
         y_column: str = "value",
         color_column: Optional[str] = None,
         **kwargs: Any,
@@ -303,7 +309,7 @@ class DataResponse(BaseModel):
 
         Args:
             chart_type: Type of chart - "line", "bar", "area", "scatter" (default: "line")
-            x_column: Column name for x-axis (default: "Period")
+            x_column: Column name for x-axis (default: "period", INE's period label)
             y_column: Column name for y-axis values (default: "value")
             color_column: Optional column to use for coloring by dimension
             **kwargs: Additional arguments passed to plotting functions
@@ -328,7 +334,7 @@ class DataResponse(BaseModel):
         from pyptine.visualization.charts import plot_indicator
 
         return plot_indicator(
-            self.data,
+            self._chronological(),
             title=self.title,
             x_column=x_column,
             y_column=y_column,
@@ -339,7 +345,7 @@ class DataResponse(BaseModel):
 
     def plot_line(
         self,
-        x_column: str = "Period",
+        x_column: str = "period",
         y_column: str = "value",
         color_column: Optional[str] = None,
         markers: bool = True,
@@ -348,7 +354,7 @@ class DataResponse(BaseModel):
         """Create an interactive line chart of the indicator data.
 
         Args:
-            x_column: Column name for x-axis (default: "Period")
+            x_column: Column name for x-axis (default: "period", INE's period label)
             y_column: Column name for y-axis values (default: "value")
             color_column: Optional column for coloring lines
             markers: Show markers on line points (default: True)
@@ -365,7 +371,7 @@ class DataResponse(BaseModel):
         from pyptine.visualization.charts import plot_line_chart
 
         return plot_line_chart(
-            self.data,
+            self._chronological(),
             title=self.title,
             x_column=x_column,
             y_column=y_column,
@@ -376,7 +382,7 @@ class DataResponse(BaseModel):
 
     def plot_bar(
         self,
-        x_column: str = "Period",
+        x_column: str = "period",
         y_column: str = "value",
         color_column: Optional[str] = None,
         **kwargs: Any,
@@ -400,7 +406,7 @@ class DataResponse(BaseModel):
         from pyptine.visualization.charts import plot_bar_chart
 
         return plot_bar_chart(
-            self.data,
+            self._chronological(),
             title=self.title,
             x_column=x_column,
             y_column=y_column,
@@ -410,7 +416,7 @@ class DataResponse(BaseModel):
 
     def plot_area(
         self,
-        x_column: str = "Period",
+        x_column: str = "period",
         y_column: str = "value",
         color_column: Optional[str] = None,
         **kwargs: Any,
@@ -434,7 +440,7 @@ class DataResponse(BaseModel):
         from pyptine.visualization.charts import plot_area_chart
 
         return plot_area_chart(
-            self.data,
+            self._chronological(),
             title=self.title,
             x_column=x_column,
             y_column=y_column,
@@ -444,7 +450,7 @@ class DataResponse(BaseModel):
 
     def plot_scatter(
         self,
-        x_column: str = "Period",
+        x_column: str = "period",
         y_column: str = "value",
         color_column: Optional[str] = None,
         size_column: Optional[str] = None,
@@ -470,7 +476,7 @@ class DataResponse(BaseModel):
         from pyptine.visualization.charts import plot_scatter_chart
 
         return plot_scatter_chart(
-            self.data,
+            self._chronological(),
             title=self.title,
             x_column=x_column,
             y_column=y_column,
@@ -486,8 +492,18 @@ class DataResponse(BaseModel):
                 "title": "Resident population",
                 "language": "EN",
                 "data": [
-                    {"Period": "2020", "Geographic localization": "Portugal", "value": 10298252},
-                    {"Period": "2021", "Geographic localization": "Portugal", "value": 10295909},
+                    {
+                        "period": "2021",
+                        "period_code": "S7A2021",
+                        "geocod": "PT",
+                        "value": 10599117.0,
+                    },
+                    {
+                        "period": "2022",
+                        "period_code": "S7A2022",
+                        "geocod": "PT",
+                        "value": 10929704.0,
+                    },
                 ],
                 "unit": "No.",
             }

@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 from pyptine.client.async_data import AsyncDataClient
 from pyptine.client.metadata import MetadataClient
+from pyptine.client.parsing import DimensionFilters
 from pyptine.models.response import DataResponse
 
 logger = logging.getLogger(__name__)
@@ -34,9 +35,8 @@ class AsyncINE:
     Features:
         - Non-blocking I/O with async/await
         - Concurrent requests for multiple indicators
-        - Full pagination support with streaming
+        - Every period, fetched in batches of periods (get_all_data)
         - Dimension filtering
-        - Automatic retry logic
     """
 
     def __init__(
@@ -78,7 +78,7 @@ class AsyncINE:
     async def get_data(
         self,
         varcd: str,
-        dimensions: Optional[dict[str, str]] = None,
+        dimensions: Optional[DimensionFilters] = None,
     ) -> DataResponse:
         """Fetch indicator data asynchronously.
 
@@ -108,18 +108,16 @@ class AsyncINE:
     async def get_all_data(
         self,
         varcd: str,
-        dimensions: Optional[dict[str, str]] = None,
-        chunk_size: int = 40000,
+        dimensions: Optional[DimensionFilters] = None,
+        periods_per_request: int = AsyncDataClient.DEFAULT_PERIODS_PER_REQUEST,
     ) -> AsyncIterator[DataResponse]:
-        """Fetch all data for an indicator with async pagination.
-
-        Streams data in chunks without loading everything into memory.
-        Ideal for large datasets.
+        """Fetch every period of an indicator, a batch of periods per request.
 
         Args:
             varcd: Indicator code
             dimensions: Optional dimension filters
-            chunk_size: Number of records per chunk (default: 40,000)
+            periods_per_request: Periods per request (INE has no row pagination;
+                without Dim1 it returns only the latest period)
 
         Yields:
             DataResponse objects, one per chunk
@@ -132,7 +130,9 @@ class AsyncINE:
         if not self.data_client:
             raise RuntimeError("Client not initialized. Use 'async with' context manager.")
 
-        async for chunk in self.data_client.get_all_data(varcd, dimensions, chunk_size):
+        async for chunk in self.data_client.get_all_data(
+            varcd, dimensions, periods_per_request=periods_per_request
+        ):
             yield chunk
 
     async def get_metadata(self, varcd: str) -> Any:

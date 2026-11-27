@@ -17,10 +17,10 @@ High-level Python client for Statistics Portugal (INE) API. Query and download s
 - 💾 **Smart Caching**: Disk-based caching reduces redundant API calls, speeding up repeated queries.
 - 🔍 **Metadata Browsing**: Search and discover indicators, themes, and dimensions.
 - 🖥️ **Enhanced CLI**: Rich formatting with progress bars, tables, and colored output.
-- 📑 **True Pagination**: Efficient streaming of large datasets with `get_all_data()`.
+- 📅 **Every Period**: `get_all_data()` fetches all of an indicator's periods, a batch per request.
 - 📖 **Modern Python**: Fully type-annotated for better developer experience and IDE support.
-- ✅ **Well-Tested**: Comprehensive test suite with 81% code coverage (239 tests).
-- 🔄 **API Compatible**: Supports both old and new INE API response formats seamlessly.
+- ✅ **Tested against real INE responses**: offline tests on recorded responses, plus a weekly check against the live API.
+- 🛑 **Refuses rather than guesses**: INE's refusals and invalid dimension codes raise errors that name the cause.
 
 ## Installation
 
@@ -48,10 +48,10 @@ results = ine.search("gdp")
 for indicator in results[:5]:  # Print top 5 results
     print(f"- {indicator.varcd}: {indicator.title}")
 
-# 2. Get data for a specific indicator
-varcd = "0004167"  # Resident population
+# 2. Get data for a specific indicator (without a period filter: the latest period only)
+varcd = "0008273"  # Resident population by place of residence, sex and age group
 print(f"\nFetching data for indicator {varcd}...")
-response = ine.get_data(varcd)
+response = ine.get_data(varcd, dimensions={"Dim1": ["S7A2022", "S7A2023"], "Dim2": "PT"})
 
 # 3. Convert to a pandas DataFrame
 df = response.to_dataframe()
@@ -84,12 +84,12 @@ async def main():
         import asyncio
         responses = await asyncio.gather(
             ine.get_data("0004167"),
-            ine.get_data("0004127"),
+            ine.get_data("0008273"),
             ine.get_data("0008074")
         )
 
-        # Stream large datasets
-        async for chunk in ine.get_all_data("0004127", chunk_size=40000):
+        # Every period, a batch of periods per request
+        async for chunk in ine.get_all_data("0008273", {"Dim2": "PT"}, periods_per_request=5):
             df_chunk = chunk.to_dataframe()
             print(f"Processing {len(df_chunk)} rows...")
 
@@ -98,9 +98,9 @@ asyncio.run(main())
 
 **AsyncINE Features:**
 - Non-blocking I/O for faster concurrent requests
-- Async iterator for memory-efficient pagination
-- Same API as the synchronous `INE` client
-- Automatic connection pooling and retries
+- Async iterator over batches of periods (`get_all_data`)
+- Same parsing, validation and errors as the synchronous `INE` client
+- Connection pooling (no retries yet, and no cache)
 
 ## Command-Line Usage
 
@@ -111,13 +111,13 @@ The pyptine CLI provides a convenient way to access INE data from your terminal,
 pyptine search "pib"
 
 # Get detailed information about a specific indicator
-pyptine info 0004127
+pyptine info 0008273
 
 # Download data for an indicator to a CSV file (with progress bar)
-pyptine download 0004127 --output data.csv
+pyptine download 0008273 --output data.csv
 
 # Download data and filter by dimensions
-pyptine download 0004167 --output filtered_data.csv -d Dim1=S7A2023 -d Dim2=PT
+pyptine download 0008273 --output filtered_data.csv -d Dim1=S7A2022,S7A2023 -d Dim2=PT
 
 # List all available statistical themes (in formatted table)
 pyptine list-commands themes
@@ -198,9 +198,13 @@ for dim in dimensions:
 #### Getting Data
 
 The `get_data` method returns a `DataResponse` object, which can be easily converted to different formats.
+Every row carries `period` (INE's label, e.g. `"2022"` or `"1st Quarter 2026"`), `period_code`
+(e.g. `"S7A2022"`), `geocod`/`geodsg` (geographic code and name), any extra dimensions as
+`dim_<n>`/`dim_<n>_t` (code and label), `ind_string` (INE's display form) and `value` (a float,
+or None where INE suppresses the figure).
 
 ```python
-response = ine.get_data("0004127")
+response = ine.get_data("0008273")  # the latest period only
 
 # Convert to pandas DataFrame
 df = response.to_dataframe()
@@ -214,20 +218,30 @@ json_str = response.to_json()
 
 #### Filtering Data with Dimensions
 
-Use the `dimensions` parameter to filter data before downloading.
+Use the `dimensions` parameter to filter data before downloading. `Dim1` is always the period
+and `Dim2` the geography. Values are **codes**, the `code` of each value from `get_dimensions()`
+(INE's `cat_id`): the period `S7A2023`, not its label `2023`. A value may be one code, a list
+of codes or a comma-separated string.
 
 ```python
-# Get data for the year 2023 and region "Portugal"
-# Note: Dimension values use specific codes (e.g., 'S7A2023' for year 2023)
 filtered_response = ine.get_data(
-    "0004167",
+    "0008273",
     dimensions={
-        "Dim1": "S7A2023",  # Year 2023
-        "Dim2": "PT"        # Geographic region 'Portugal'
+        "Dim1": ["S7A2022", "S7A2023"],  # two years
+        "Dim2": "PT",                    # Portugal
+        "Dim3": "T",                     # both sexes
+        "Dim4": "T",                     # all ages
     }
 )
 df_filtered = filtered_response.to_dataframe()
 ```
+
+Things INE does that are worth knowing (verified 2026-11-27):
+
+- **Without `Dim1`, INE returns only the latest period.** Ask for periods explicitly, or use `get_all_data()`.
+- **One request returns every geographic level at once** (country, NUTS I/II/III and municipalities for many indicators). Filter `Dim2`, or the rows by `geocod`, before adding values up.
+- **An invalid code raises `DimensionError`** before any request, naming the code to use when you passed a label or INE's `categ_cod` (e.g. `H.1` for `H1`).
+- **INE's refusals raise `INERefusalError`** (INE answers them with HTTP 200), with INE's `ine_code` and `ine_message`. They are never cached.
 
 #### Exporting Data
 
@@ -235,10 +249,10 @@ You can export data directly to CSV or JSON files.
 
 ```python
 # Export to CSV
-ine.export_csv("0004127", "output.csv")
+ine.export_csv("0008273", "output.csv")
 
 # Export to JSON with pretty printing
-ine.export_json("0004127", "output.json", pretty=True)
+ine.export_json("0008273", "output.json", pretty=True)
 
 # Export filtered data
 ine.export_csv(
@@ -248,38 +262,33 @@ ine.export_csv(
 )
 ```
 
-#### Working with Large Datasets
+#### Every Period of an Indicator
 
-For large datasets that exceed the default 40,000 data point limit, use the `get_all_data()` method which automatically handles pagination:
+INE has no row pagination, and returns only the latest period when no period is given.
+`get_all_data()` asks for the indicator's periods (or those in `dimensions["Dim1"]`), a batch
+of `periods_per_request` periods per request, oldest first:
 
 ```python
-from pyptine.client.data import DataClient
+import pandas as pd
 
-client = DataClient(language="EN")
+chunks = ine.get_all_data("0008273", {"Dim2": "PT", "Dim3": "T", "Dim4": "T"})
+df = pd.concat([chunk.to_dataframe() for chunk in chunks], ignore_index=True)
 
-# Fetch data in chunks (default chunk_size=40,000)
-for chunk in client.get_all_data("0004127"):
-    df = chunk.to_dataframe()
-    print(f"Processed {len(df)} rows")
-    # Process each chunk
-
-# Custom chunk size
-for chunk in client.get_all_data("0004127", chunk_size=5000):
-    # Process smaller chunks
-    pass
-
-# Combine all chunks into a single dataset
-all_chunks = list(client.get_all_data("0004127"))
-all_data = [point for chunk in all_chunks for point in chunk.data]
+# Fewer periods per request for indicators with many rows per period
+for chunk in ine.get_all_data("0008273", periods_per_request=1):
+    print(chunk.data[0]["period"], len(chunk.data), "rows")
 ```
+
+`chunk_size` (from earlier versions) is ignored, with a `DeprecationWarning`.
 
 #### Visualizing Data
 
 Create interactive visualizations directly from indicator data without exporting to DataFrame:
 
 ```python
-# Get data and create interactive line chart
-response = ine.get_data("0004127")
+# Get data and create interactive line chart (x axis: the period label, in period order)
+response = ine.get_data("0008273", {"Dim1": ["S7A2021", "S7A2022", "S7A2023"],
+                                    "Dim2": "PT", "Dim3": "T", "Dim4": "T"})
 fig = response.plot(chart_type="line")
 fig.show()
 
@@ -291,12 +300,12 @@ fig_scatter = response.plot_scatter()
 # Customize visualization
 fig = response.plot_line(
     markers=True,
-    x_column="Period",
+    x_column="period",
     y_column="value"
 )
 
-# Color by dimensions (if data has dimension columns)
-fig = response.plot_line(color_column="region")
+# Color by a dimension (one line per geographic unit, sex, ...)
+fig = response.plot_line(color_column="geodsg")
 
 # Save to HTML for sharing
 fig.write_html("indicator_plot.html")
@@ -321,14 +330,17 @@ All methods support:
 
 #### Advanced Data Analysis
 
-Perform statistical calculations on indicator data directly within the library:
+Perform statistical calculations on one series (one row per period). INE data usually holds
+several series per period (every geographic unit, every category), so filter to one first; the
+methods refuse data with several rows per period. Periods are ordered by `period_code`.
 
 ```python
-# Get data and calculate year-over-year growth
-response = ine.get_data("0004127")
+# One series: Portugal, both sexes, all ages, three years
+response = ine.get_data("0008273", {"Dim1": ["S7A2021", "S7A2022", "S7A2023"],
+                                    "Dim2": "PT", "Dim3": "T", "Dim4": "T"})
 yoy_response = response.calculate_yoy_growth()
 df_yoy = yoy_response.to_dataframe()
-print(df_yoy[['Period', 'value', 'yoy_growth']])
+print(df_yoy[['period', 'value', 'yoy_growth']])
 
 # Calculate month-over-month changes
 mom_response = response.calculate_mom_change()
@@ -345,12 +357,12 @@ df_ema = ema_response.to_dataframe()
 # Chain multiple analyses
 result = response.calculate_yoy_growth().calculate_moving_average(window=2)
 df = result.to_dataframe()
-print(df[['Period', 'value', 'yoy_growth', 'moving_avg']])
+print(df[['period', 'value', 'yoy_growth', 'moving_avg']])
 ```
 
 Available analysis methods on `DataResponse`:
-- `calculate_yoy_growth()` - Year-over-year percentage change
-- `calculate_mom_change()` - Month-over-month percentage change
+- `calculate_yoy_growth()` - Percentage change from the same period one year earlier (same quarter, same month)
+- `calculate_mom_change()` - Percentage change from the preceding period
 - `calculate_moving_average(window)` - Simple moving average
 - `calculate_exponential_moving_average(span)` - Exponential weighted moving average
 
@@ -367,7 +379,8 @@ The main class for interacting with the INE API.
 | Method | Description |
 | --- | --- |
 | `search(query, ...)` | Search for indicators. |
-| `get_data(varcd, ...)` | Get data for an indicator as a `DataResponse` object. |
+| `get_data(varcd, ...)` | Get data for an indicator as a `DataResponse` object (the latest period unless `Dim1` is given). |
+| `get_all_data(varcd, ...)` | Get every period of an indicator, one `DataResponse` per batch of periods. |
 | `get_metadata(varcd)` | Get detailed metadata for an indicator. |
 | `get_dimensions(varcd)` | Get available dimensions for an indicator. |
 | `get_indicator(varcd)` | Get catalogue information for a single indicator. |

@@ -24,10 +24,10 @@ from pyptine.visualization.charts import (
 def sample_data():
     """Sample data for visualization tests."""
     return [
-        {"Period": "2020", "value": 100, "region": "PT"},
-        {"Period": "2021", "value": 110, "region": "PT"},
-        {"Period": "2022", "value": 120, "region": "PT"},
-        {"Period": "2023", "value": 132, "region": "PT"},
+        {"period": "2020", "value": 100, "region": "PT"},
+        {"period": "2021", "value": 110, "region": "PT"},
+        {"period": "2022", "value": 120, "region": "PT"},
+        {"period": "2023", "value": 132, "region": "PT"},
     ]
 
 
@@ -41,12 +41,12 @@ def sample_dataframe(sample_data):
 def sample_multiregion_data():
     """Sample data with multiple regions for coloring."""
     return [
-        {"Period": "2020", "value": 100, "region": "North"},
-        {"Period": "2020", "value": 150, "region": "South"},
-        {"Period": "2021", "value": 110, "region": "North"},
-        {"Period": "2021", "value": 160, "region": "South"},
-        {"Period": "2022", "value": 120, "region": "North"},
-        {"Period": "2022", "value": 170, "region": "South"},
+        {"period": "2020", "value": 100, "region": "North"},
+        {"period": "2020", "value": 150, "region": "South"},
+        {"period": "2021", "value": 110, "region": "North"},
+        {"period": "2021", "value": 160, "region": "South"},
+        {"period": "2022", "value": 120, "region": "North"},
+        {"period": "2022", "value": 170, "region": "South"},
     ]
 
 
@@ -142,7 +142,7 @@ class TestLineChart:
         fig = plot_line_chart(
             sample_data,
             title="Test",
-            x_column="Period",
+            x_column="period",
             y_column="value",
         )
 

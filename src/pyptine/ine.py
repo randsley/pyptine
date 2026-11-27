@@ -1,6 +1,7 @@
 """High-level API for INE Portugal data access."""
 
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
@@ -8,6 +9,7 @@ from pyptine.client.base import INEClient
 from pyptine.client.catalogue import CatalogueClient
 from pyptine.client.data import DataClient
 from pyptine.client.metadata import MetadataClient
+from pyptine.client.parsing import DimensionFilters
 from pyptine.models.indicator import Dimension, Indicator, IndicatorMetadata
 from pyptine.models.response import DataResponse
 from pyptine.processors.csv import export_to_csv
@@ -40,9 +42,9 @@ class INE:
         >>> results = ine.search("population")
         >>> print(f"Found {len(results)} indicators")
         >>>
-        >>> # Get data as DataFrame
-        >>> df = ine.get_data("0004127")
-        >>> print(df.head())
+        >>> # Get data (the latest period unless Dim1 is given)
+        >>> response = ine.get_data("0008273", dimensions={"Dim1": ["S7A2021", "S7A2022"]})
+        >>> print(response.to_dataframe().head())
         >>>
         >>> # Export to CSV
         >>> ine.export_csv("0004127", "output.csv")
@@ -151,20 +153,27 @@ class INE:
     def get_data(
         self,
         varcd: str,
-        dimensions: Optional[dict[str, str]] = None,
+        dimensions: Optional[DimensionFilters] = None,
     ) -> DataResponse:
         """Get indicator data.
 
+        Without a period filter (``Dim1``), INE returns only the **latest period**. Ask for
+        several periods with a list (``{"Dim1": ["S7A2021", "S7A2022"]}``) or use
+        :meth:`get_all_data` for every period.
+
         Args:
             varcd: Indicator code
-            dimensions: Optional dimension filters (e.g., {"Dim1": "2020"})
+            dimensions: Optional filters by dimension. Each value is one code, a list of codes
+                or a comma-separated string. Codes are ``DimensionValue.code`` from
+                :meth:`get_dimensions` (e.g. period ``S7A2022``, not the label ``2022``).
 
         Returns:
-            DataResponse object with indicator data.
-            Use .to_dataframe(), .to_json(), or .to_dict() for specific formats.
+            DataResponse whose rows carry ``period`` (INE's label), ``period_code`` and
+            ``value``. Use .to_dataframe(), .to_json(), or .to_dict() for specific formats.
 
         Raises:
-            InvalidIndicatorError: If indicator code is invalid
+            DimensionError: If a dimension key or code is not valid for the indicator
+            INERefusalError: If INE refused the request (e.g. an unknown indicator code)
             APIError: If API request fails
 
         Example:
@@ -179,6 +188,35 @@ class INE:
         # Fetch data from API
         response = self.data_client.get_data(varcd=varcd, dimensions=dimensions)
         return response
+
+    def get_all_data(
+        self,
+        varcd: str,
+        dimensions: Optional[DimensionFilters] = None,
+        periods_per_request: int = DataClient.DEFAULT_PERIODS_PER_REQUEST,
+    ) -> Iterator[DataResponse]:
+        """Get every period of an indicator, a batch of periods per request.
+
+        INE returns only the latest period when no period is given and has no row
+        pagination, so this asks for the indicator's periods (or those in
+        ``dimensions["Dim1"]``) in batches of ``periods_per_request``.
+
+        Args:
+            varcd: Indicator code
+            dimensions: Optional filters, as for :meth:`get_data`
+            periods_per_request: Periods per request (lower it for large indicators)
+
+        Yields:
+            One DataResponse per batch of periods, oldest first
+
+        Example:
+            >>> ine = INE()
+            >>> rows = [r for chunk in ine.get_all_data("0008273", {"Dim2": "PT", "Dim3": "T",
+            ...         "Dim4": "T"}) for r in chunk.data]
+        """
+        return self.data_client.get_all_data(
+            varcd, dimensions=dimensions, periods_per_request=periods_per_request
+        )
 
     def get_metadata(self, varcd: str) -> IndicatorMetadata:
         """Get indicator metadata.
@@ -288,7 +326,7 @@ class INE:
         self,
         varcd: str,
         filepath: Union[str, Path],
-        dimensions: Optional[dict[str, str]] = None,
+        dimensions: Optional[DimensionFilters] = None,
         include_metadata: bool = True,
     ) -> None:
         """Export indicator data to CSV file.
@@ -302,7 +340,7 @@ class INE:
         Example:
             >>> ine = INE()
             >>> ine.export_csv("0004167", "data.csv")
-            >>> ine.export_csv("0004167", "filtered.csv", dimensions={"Dim1": "2020"})
+            >>> ine.export_csv("0004167", "filtered.csv", dimensions={"Dim1": "S7A2020"})
         """
         logger.info(f"Exporting indicator {varcd} to {filepath}")
 
@@ -335,7 +373,7 @@ class INE:
         self,
         varcd: str,
         filepath: Union[str, Path],
-        dimensions: Optional[dict[str, str]] = None,
+        dimensions: Optional[DimensionFilters] = None,
         pretty: bool = True,
     ) -> None:
         """Export indicator data to JSON file.

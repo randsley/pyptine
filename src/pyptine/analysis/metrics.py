@@ -1,7 +1,18 @@
-"""Statistical metrics for data analysis."""
+"""Statistical metrics for data analysis.
+
+Every function works on one series: one row per period. INE data usually has several rows per
+period (every geographic unit, every category of an extra dimension), so filter to one series
+first, e.g. ``[r for r in response.data if r["geocod"] == "PT"]``, or request one with
+dimension filters. The functions refuse data with several rows per period.
+
+Periods are sorted by ``period_column``. The default is ``period_code`` (INE's period code,
+e.g. "S7A2022"), which sorts chronologically within an indicator. Labels such as
+"1st Quarter 2026" do not, so do not sort by ``period``.
+"""
 
 import logging
-from typing import Any, cast
+import re
+from typing import Any, Optional, cast
 
 try:
     import pandas as pd
@@ -12,249 +23,197 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_PERIOD_COLUMN = "period_code"
+
+# INE period codes: S<n>A then the year, then the quarter (1 digit) or month (2 digits).
+# Annual S7A2022, quarterly S5A20261, monthly S3A202601 (verified 2026-11-27).
+_INE_PERIOD = re.compile(r"^(S\d+A)(\d{4})(\d{0,2})$")
+# Plain forms: 2022, 2022-01.
+_PLAIN_PERIOD = re.compile(r"^(\d{4})(-\d{2})?$")
+
+
+def _require_pandas(what: str) -> None:
+    if not PANDAS_AVAILABLE:
+        raise ImportError(f"pandas is required for {what}. Install with: pip install pandas")
+
+
+def _series_frame(
+    data: list[dict[str, Any]], value_column: str, period_column: str
+) -> "pd.DataFrame":
+    """One series as a DataFrame sorted by period; refuses missing columns and repeats."""
+    if any(value_column not in row or period_column not in row for row in data):
+        raise ValueError(f"Data must contain '{value_column}' and '{period_column}' columns")
+    df = pd.DataFrame(data).copy()
+    repeats = df[period_column].duplicated(keep=False)
+    if repeats.any():
+        n_periods = df[period_column].nunique()
+        raise ValueError(
+            f"Data has several rows per period ({len(df)} rows, {n_periods} periods in "
+            f"'{period_column}'): it holds more than one series (e.g. several geographic units "
+            "or categories). Filter to one series first, e.g. one geocod and one code of each "
+            "extra dimension."
+        )
+    df[value_column] = pd.to_numeric(df[value_column], errors="coerce")
+    return df.sort_values(by=period_column, kind="stable")
+
+
+def _year_earlier(period: Any) -> Optional[str]:
+    """The same period one year earlier, or None if the form is not recognised."""
+    text = str(period)
+    m = _INE_PERIOD.match(text)
+    if m:
+        return f"{m.group(1)}{int(m.group(2)) - 1}{m.group(3)}"
+    m = _PLAIN_PERIOD.match(text)
+    if m:
+        return f"{int(m.group(1)) - 1}{m.group(2) or ''}"
+    return None
+
+
+def _records(df: "pd.DataFrame") -> list[dict[str, Any]]:
+    df = df.astype(object).where(df.notna(), None)
+    return cast(list[dict[str, Any]], df.to_dict(orient="records"))
+
 
 def calculate_yoy_growth(
     data: list[dict[str, Any]],
     value_column: str = "value",
-    period_column: str = "Period",
+    period_column: str = DEFAULT_PERIOD_COLUMN,
 ) -> list[dict[str, Any]]:
-    """Calculate year-over-year growth rates.
+    """Calculate year-over-year growth rates (%).
 
-    Compares each period's value to the same period in the previous year.
-    Returns a list of data points with an added 'yoy_growth' column containing
-    the percentage change from year to year.
+    Compares each period with the same period one year earlier (2022 with 2021, 1st quarter
+    2026 with 1st quarter 2025, January 2026 with January 2025), not with the previous row.
+    ``yoy_growth`` is None where that period is absent or its value is missing or zero.
 
     Args:
-        data: List of data dictionaries with at least 'value' and period columns
-        value_column: Name of the column containing values (default: "value")
-        period_column: Name of the column containing time period (default: "Period")
+        data: One series (one row per period)
+        value_column: Column with the values (default: "value")
+        period_column: Column with the periods (default: "period_code"). Accepted forms: INE
+            period codes (S7A2022, S5A20261, S3A202601), years (2022) and year-months (2022-01).
 
     Returns:
-        List of data points with added 'yoy_growth' column (None for first year)
+        The rows sorted by period, with an added 'yoy_growth' column
 
     Raises:
-        ValueError: If required columns are missing or if no period data is available
+        ValueError: If columns are missing, a period has several rows, or a period is in a
+            form whose year-earlier period cannot be determined
 
     Example:
-        >>> data = [
-        ...     {"Period": "2021", "value": 100},
-        ...     {"Period": "2022", "value": 110},
-        ...     {"Period": "2023", "value": 120},
-        ... ]
-        >>> result = calculate_yoy_growth(data)
-        >>> # result[0]['yoy_growth'] is None
-        >>> # result[1]['yoy_growth'] is 10.0 (10% growth)
-        >>> # result[2]['yoy_growth'] is ~9.09% growth
+        >>> data = [{"period_code": "S7A2021", "value": 100}, {"period_code": "S7A2022", "value": 110}]
+        >>> [r["yoy_growth"] for r in calculate_yoy_growth(data)]
+        [None, 10.0]
     """
-    if not PANDAS_AVAILABLE:
-        raise ImportError(
-            "pandas is required for YoY growth calculation. Install with: pip install pandas"
-        )
-
+    _require_pandas("YoY growth calculation")
     if not data:
         return []
-
-    if value_column not in data[0] or period_column not in data[0]:
-        raise ValueError(f"Data must contain '{value_column}' and '{period_column}' columns")
-
-    df = pd.DataFrame(data).copy()
-
-    # Ensure period is sorted
-    df = df.sort_values(by=period_column)
-
-    # Calculate YoY growth
-    df["yoy_growth"] = None
-    if value_column in df.columns and df[value_column].dtype in [float, int]:
-        # Calculate percentage change year-over-year
-        df["yoy_growth"] = df[value_column].pct_change() * 100
-
+    df = _series_frame(data, value_column, period_column)
+    by_period = dict(zip(df[period_column].astype(str), df[value_column]))
+    growth: list[Optional[float]] = []
+    for period, value in zip(df[period_column], df[value_column]):
+        earlier = _year_earlier(period)
+        if earlier is None:
+            raise ValueError(
+                f"Cannot tell the period a year before {period!r}; use INE period codes "
+                "(the 'period_code' column), years (2022) or year-months (2022-01)"
+            )
+        previous = by_period.get(earlier)
+        if previous is None or pd.isna(previous) or previous == 0 or pd.isna(value):
+            growth.append(None)
+        else:
+            growth.append((value / previous - 1) * 100)
+    df["yoy_growth"] = growth
     logger.debug(f"Calculated YoY growth for {len(df)} data points")
-
-    return cast(list[dict[str, Any]], df.to_dict(orient="records"))
+    return _records(df)
 
 
 def calculate_mom_change(
     data: list[dict[str, Any]],
     value_column: str = "value",
-    period_column: str = "Period",
+    period_column: str = DEFAULT_PERIOD_COLUMN,
 ) -> list[dict[str, Any]]:
-    """Calculate month-over-month percentage changes.
+    """Calculate the percentage change from the preceding period.
 
-    Compares each period's value to the immediately preceding period.
-    Returns a list of data points with an added 'mom_change' column containing
-    the percentage change from period to period.
+    Month-over-month for monthly data; for other frequencies it is the change from the
+    preceding period present in the data (quarter-over-quarter, and so on).
 
     Args:
-        data: List of data dictionaries with at least 'value' and period columns
-        value_column: Name of the column containing values (default: "value")
-        period_column: Name of the column containing time period (default: "Period")
+        data: One series (one row per period)
+        value_column: Column with the values (default: "value")
+        period_column: Column with the periods (default: "period_code")
 
     Returns:
-        List of data points with added 'mom_change' column (None for first period)
+        The rows sorted by period, with an added 'mom_change' column (None for the first)
 
     Raises:
-        ValueError: If required columns are missing
-
-    Example:
-        >>> data = [
-        ...     {"Period": "2023-01", "value": 100},
-        ...     {"Period": "2023-02", "value": 105},
-        ...     {"Period": "2023-03", "value": 102},
-        ... ]
-        >>> result = calculate_mom_change(data)
-        >>> # result[0]['mom_change'] is None
-        >>> # result[1]['mom_change'] is 5.0 (5% growth)
-        >>> # result[2]['mom_change'] is ~-2.86% (decline)
+        ValueError: If columns are missing or a period has several rows
     """
-    if not PANDAS_AVAILABLE:
-        raise ImportError(
-            "pandas is required for MoM change calculation. Install with: pip install pandas"
-        )
-
+    _require_pandas("MoM change calculation")
     if not data:
         return []
-
-    if value_column not in data[0] or period_column not in data[0]:
-        raise ValueError(f"Data must contain '{value_column}' and '{period_column}' columns")
-
-    df = pd.DataFrame(data).copy()
-
-    # Ensure period is sorted
-    df = df.sort_values(by=period_column)
-
-    # Calculate MoM change
-    df["mom_change"] = None
-    if value_column in df.columns and df[value_column].dtype in [float, int]:
-        # Calculate percentage change month-over-month
-        df["mom_change"] = df[value_column].pct_change() * 100
-
+    df = _series_frame(data, value_column, period_column)
+    df["mom_change"] = df[value_column].pct_change(fill_method=None) * 100
     logger.debug(f"Calculated MoM change for {len(df)} data points")
-
-    return cast(list[dict[str, Any]], df.to_dict(orient="records"))
+    return _records(df)
 
 
 def calculate_moving_average(
     data: list[dict[str, Any]],
     window: int = 3,
     value_column: str = "value",
-    period_column: str = "Period",
+    period_column: str = DEFAULT_PERIOD_COLUMN,
 ) -> list[dict[str, Any]]:
-    """Calculate simple moving average over a time window.
-
-    Computes the rolling mean of values over a specified window size.
-    Returns a list of data points with an added 'moving_avg' column.
+    """Calculate a simple moving average over ``window`` consecutive periods.
 
     Args:
-        data: List of data dictionaries with at least 'value' and period columns
-        window: Number of periods to include in the moving average (default: 3)
-        value_column: Name of the column containing values (default: "value")
-        period_column: Name of the column containing time period (default: "Period")
+        data: One series (one row per period)
+        window: Number of periods in the average (default: 3)
+        value_column: Column with the values (default: "value")
+        period_column: Column with the periods (default: "period_code")
 
     Returns:
-        List of data points with added 'moving_avg' column (None for first window-1 periods)
+        The rows sorted by period, with an added 'moving_avg' column (None for the first
+        window-1 periods)
 
     Raises:
-        ValueError: If required columns are missing or window size is invalid
-
-    Example:
-        >>> data = [
-        ...     {"Period": "2023-01", "value": 100},
-        ...     {"Period": "2023-02", "value": 110},
-        ...     {"Period": "2023-03", "value": 105},
-        ...     {"Period": "2023-04", "value": 120},
-        ... ]
-        >>> result = calculate_moving_average(data, window=3)
-        >>> # result[0]['moving_avg'] is None
-        >>> # result[1]['moving_avg'] is None
-        >>> # result[2]['moving_avg'] is 105.0 (mean of 100, 110, 105)
-        >>> # result[3]['moving_avg'] is 111.67 (mean of 110, 105, 120)
+        ValueError: If columns are missing, a period has several rows, or window < 1
     """
-    if not PANDAS_AVAILABLE:
-        raise ImportError(
-            "pandas is required for moving average calculation. Install with: pip install pandas"
-        )
-
+    _require_pandas("moving average calculation")
     if not data:
         return []
-
     if window < 1:
         raise ValueError(f"Window size must be at least 1, got {window}")
-
-    if value_column not in data[0] or period_column not in data[0]:
-        raise ValueError(f"Data must contain '{value_column}' and '{period_column}' columns")
-
-    df = pd.DataFrame(data).copy()
-
-    # Ensure period is sorted
-    df = df.sort_values(by=period_column)
-
-    # Calculate moving average
-    df["moving_avg"] = None
-    if value_column in df.columns and df[value_column].dtype in [float, int]:
-        df["moving_avg"] = df[value_column].rolling(window=window, center=False).mean()
-
+    df = _series_frame(data, value_column, period_column)
+    df["moving_avg"] = df[value_column].rolling(window=window, center=False).mean()
     logger.debug(f"Calculated {window}-period moving average for {len(df)} data points")
-
-    return cast(list[dict[str, Any]], df.to_dict(orient="records"))
+    return _records(df)
 
 
 def calculate_exponential_moving_average(
     data: list[dict[str, Any]],
     span: int = 3,
     value_column: str = "value",
-    period_column: str = "Period",
+    period_column: str = DEFAULT_PERIOD_COLUMN,
 ) -> list[dict[str, Any]]:
-    """Calculate exponential moving average.
-
-    Computes the exponentially weighted moving mean, giving more weight to recent values.
-    Returns a list of data points with an added 'ema' column.
+    """Calculate an exponential moving average.
 
     Args:
-        data: List of data dictionaries with at least 'value' and period columns
-        span: Span parameter for EMA calculation - higher values give less weight to recent data (default: 3)
-        value_column: Name of the column containing values (default: "value")
-        period_column: Name of the column containing time period (default: "Period")
+        data: One series (one row per period)
+        span: Span of the exponential weighting (default: 3)
+        value_column: Column with the values (default: "value")
+        period_column: Column with the periods (default: "period_code")
 
     Returns:
-        List of data points with added 'ema' column
+        The rows sorted by period, with an added 'ema' column
 
     Raises:
-        ValueError: If required columns are missing or span is invalid
-
-    Example:
-        >>> data = [
-        ...     {"Period": "2023-01", "value": 100},
-        ...     {"Period": "2023-02", "value": 110},
-        ...     {"Period": "2023-03", "value": 105},
-        ...     {"Period": "2023-04", "value": 120},
-        ... ]
-        >>> result = calculate_exponential_moving_average(data, span=3)
-        >>> # EMA gives more weight to recent values than simple MA
+        ValueError: If columns are missing, a period has several rows, or span < 1
     """
-    if not PANDAS_AVAILABLE:
-        raise ImportError(
-            "pandas is required for EMA calculation. Install with: pip install pandas"
-        )
-
+    _require_pandas("EMA calculation")
     if not data:
         return []
-
     if span < 1:
         raise ValueError(f"Span must be at least 1, got {span}")
-
-    if value_column not in data[0] or period_column not in data[0]:
-        raise ValueError(f"Data must contain '{value_column}' and '{period_column}' columns")
-
-    df = pd.DataFrame(data).copy()
-
-    # Ensure period is sorted
-    df = df.sort_values(by=period_column)
-
-    # Calculate exponential moving average
-    df["ema"] = None
-    if value_column in df.columns and df[value_column].dtype in [float, int]:
-        df["ema"] = df[value_column].ewm(span=span, adjust=False).mean()
-
+    df = _series_frame(data, value_column, period_column)
+    df["ema"] = df[value_column].ewm(span=span, adjust=False).mean()
     logger.debug(f"Calculated EMA (span={span}) for {len(df)} data points")
-
-    return cast(list[dict[str, Any]], df.to_dict(orient="records"))
+    return _records(df)

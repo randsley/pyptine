@@ -11,7 +11,8 @@ from urllib3.util.retry import Retry
 
 from pyptine.__version__ import __version__
 from pyptine.cache.disk import DiskCache
-from pyptine.utils.exceptions import APIError, RateLimitError
+from pyptine.client.parsing import check_success
+from pyptine.utils.exceptions import APIError, INERefusalError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -240,11 +241,17 @@ class INEClient:
 
             # Parse response based on format
             if response_format == "json":
-                return self._parse_json_response(response)
+                body = self._parse_json_response(response)
+                # INE refuses with HTTP 200 and Sucesso.Falso; raise instead of returning it.
+                check_success(body, str(params.get("varcd", "")), response.url)
+                return body
             elif response_format == "xml":
                 return self._parse_xml_response(response)
             else:
                 raise ValueError(f"Unsupported response format: {response_format}")
+
+        except INERefusalError:
+            raise
 
         except requests.Timeout:
             logger.error(f"Request timeout after {self.timeout}s")
@@ -277,7 +284,7 @@ class INEClient:
         """
         try:
             data = response.json()
-            logger.debug(f"Parsed JSON response with {len(str(data))} characters")
+            logger.debug("Parsed JSON response of %d bytes", len(response.content))
             return cast(dict[str, Any], data)
         except ValueError as e:
             logger.error(f"Failed to parse JSON response: {str(e)}")

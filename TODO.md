@@ -1,83 +1,35 @@
-# Project TODO List
+# TODO
 
-This document outlines suggested improvements and refactorings for the `pyptine` project, categorized by impact and area.
+Rewritten 2026-11-27 from an audit of pyptine against the live INE API. The earlier list (January
+2026) had gone stale: several items were done, some referred to code that no longer exists
+(`CacheManager`, `get_data_paginated`), and the pagination it marked done did not work (INE
+ignores `start`/`count`). Ordered by effect on users.
 
-## High-Level / Architectural Improvements
+## Done (unreleased, see CHANGELOG)
 
-*   ~~**Centralized Error Handling for CLI:**~~ **✅ COMPLETED**
-    *   ~~**Details:** Implement a decorator or Click's context-based error handling to reduce repetitive `try...except` blocks in `src/pyptine/cli/main.py`. This will make the CLI more robust and maintainable.~~
-    *   **Implementation:** Created `src/pyptine/cli/utils.py` with centralized error handling (`handle_cli_error`), formatted output functions, and rich formatting utilities. All CLI commands refactored to use consistent error handling and rich formatting with tables, panels, and progress indicators.
-*   **`Indicator` and `IndicatorMetadata` Model Relationship:** Refactor `src/pyptine/models/indicator.py` to make `IndicatorMetadata` inherit from `Indicator` to reduce redundancy and clarify their relationship. Standardize naming (`varcd` vs. `indicator_code`, `title` vs. `indicator_name`) across these models.
-*   **`CacheManager` Role Clarification:** Re-evaluate the need for `src/pyptine/cache/manager.py`. If the `INE` class's cache methods are sufficient, consider removing `CacheManager`. Otherwise, clearly define its distinct purpose and usage guidelines.
+- Data rows carry `period` and `period_code`; INE's period key was dropped before.
+- INE refusals (HTTP 200 with `Sucesso.Falso`) raise `INERefusalError` and are not cached.
+- `get_all_data` fetches periods in batches; `chunk_size` deprecated.
+- Several codes per dimension (list or comma-separated); latest-period-only default documented.
+- Dimension validation uses `cat_id`, and names the right code for a label or `categ_cod`.
+- Analysis methods work on real data (period codes, one series, true year-over-year); plots order by period.
+- Weekly API-drift check; offline tests pinned against recorded INE responses.
+- Earlier: `get_data` always returns `DataResponse`; `search` takes `theme`; centralised CLI errors.
 
-## Mid-Level / Design Improvements
+## Open
 
-*   ~~**Visualization Module:**~~ **✅ COMPLETED**
-    *   ~~**Location:** `src/pyptine/visualization/charts.py` and DataResponse methods~~
-    *   ~~**Details:** Add a plot() method to the INE class (using plotly) to instantly visualize indicators without needing to manually export to a DataFrame first.~~
-    *   **Implementation:** Created visualization module with:
-        - `plot_indicator()` - Main plotting function with multiple chart types
-        - `plot_line_chart()` - Interactive line charts with markers
-        - `plot_bar_chart()` - Bar chart visualizations
-        - `plot_area_chart()` - Area/stacked area charts
-        - `plot_scatter_chart()` - Scatter plots with optional sizing
-        - Convenience methods on DataResponse: `plot()`, `plot_line()`, `plot_bar()`, `plot_area()`, `plot_scatter()`
-        - Full support for color and size dimensions
-        - Interactive plotly figures with export capabilities
-
-*   ~~**Advanced Data Analysis Methods:**~~ **✅ COMPLETED**
-    *   ~~**Location:** `src/pyptine/models/response.py` and analysis module~~
-    *   ~~**Details:** Add specific methods for calculating Year-over-Year (YoY) growth, Month-over-Month (MoM) changes, or moving averages directly within the library.~~
-    *   **Implementation:** Created `src/pyptine/analysis/metrics.py` with:
-        - `calculate_yoy_growth()` - Year-over-year percentage changes
-        - `calculate_mom_change()` - Month-over-month percentage changes
-        - `calculate_moving_average()` - Simple moving average with configurable window
-        - `calculate_exponential_moving_average()` - Exponentially weighted moving average
-        - Convenience methods on `DataResponse` class for easy access
-        - Full support for custom column names and chaining analyses
-
-*   **`INE.__init__` Client Initialization:** Reduce boilerplate in `src/pyptine/ine.py` by potentially using a helper function or a configuration object to handle common client initialization parameters.
-*   **`INE.get_data` Return Type Consistency:** Consider making `INE.get_data` always return a `DataResponse` object. Users can then call `to_dataframe()`, `to_json()`, etc., directly on the `DataResponse` object, simplifying the `get_data` signature and improving consistency.
-*   **`CatalogueBrowser.search` and `filter_by_theme` Integration:** Modify `CatalogueBrowser.search` in `src/pyptine/search/catalog.py` to accept a `theme` parameter. This would allow the CLI's `search` command to use a single, more intuitive filtering mechanism when both query and theme are provided.
-*   **`DataClient.get_data_paginated` Implementation:** Implement true pagination in `src/pyptine/client/data.py` if the INE API supports it. If not, adjust the method's behavior or rename it to accurately reflect its "get all data" functionality.
-*   **`DataClient._process_data_point` Error Handling:** Refine error handling in `src/pyptine/client/data.py` to catch more specific exceptions (e.g., `ValueError`, `TypeError`) and reconsider silently dropping data points. Provide clearer warnings or errors if data points are frequently dropped.
-*   **`DataClient.validate_dimensions` Implementation:** Prioritize implementing full dimension validation in `src/pyptine/client/data.py`. This would prevent invalid API requests and provide better feedback to users.
-*   **`CatalogueClient._parse_indicator_xml` Helper Function:** Move the nested `get_text` helper function from `_parse_indicator_xml` in `src/pyptine/client/catalogue.py` to be a private method of the `CatalogueClient` class (e.g., `self._get_element_text`) or a static method.
-*   **`json_to_dataframe` `data` Parameter Handling:** Clarify and potentially refine the logic for handling dictionary inputs without a "dados" key in `src/pyptine/processors/dataframe.py` to avoid unexpected behavior.
-*   **`pivot_by_dimension` and `aggregate_by_period` `value_column` Handling:** Adjust the logic in `src/pyptine/processors/dataframe.py` to correctly handle `value_column` when it is provided as a list of strings.
-*   **`merge_json_files` `merge_key` Parameter:** In `src/pyptine/processors/json.py`, either implement the merging logic based on the `merge_key` parameter or remove the parameter if it's not intended for use. Add a `TODO` comment if it's a planned future enhancement.
-*   ~~**Enhanced CLI Enhancements:**~~ **✅ COMPLETED**
-    *   **Rich Formatting:** Added colorful output with tables, panels, and formatted text
-    *   **Progress Indicators:** Implemented spinners and progress bars for downloads
-    *   **Better Error Messages:** Centralized error handling with informative panels
-    *   **Improved Organization:** Data displayed in structured tables for better readability
-
-## Low-Level / Code Quality Improvements
-
-*   **`INEClient._parse_json_response` Debug Logging:** Optimize the debug logging in `src/pyptine/client/base.py` to avoid potentially expensive `len(str(data))` calls for very large JSON responses.
-*   **`CatalogueClient` Consistent Error Re-raising:** In `src/pyptine/client/catalogue.py`, ensure all `try...except` blocks re-raise exceptions using `raise SomeSpecificError(...) from e` to preserve the original exception chain.
-*   **`MetadataClient` Custom `DimensionNotFoundError`:** Consider creating a more specific custom exception (e.g., `DimensionNotFoundError`) in `src/pyptine/client/metadata.py` to distinguish it from generic `ValueError` types.
-*   **`unflatten_json` Unit Tests:** Add more comprehensive unit tests for the array indexing logic in `unflatten_json` in `src/pyptine/processors/json.py` to cover various edge cases.
-*   **`CatalogueBrowser.get_recently_updated` `type: ignore`:** Review and potentially remove the `type: ignore` comment in `src/pyptine/search/catalog.py` by ensuring the type checker correctly infers the type after filtering `None` values.
-*   **`cli.main.py` `cache_info` Output:** In `src/pyptine/cli/main.py`, leverage the `CacheManager.format_stats()` method for displaying cache information to ensure consistent and well-formatted output.
-*   **`_get_disk_cache` Type Hinting:** In `src/pyptine/client/base.py`, ensure `_disk_cache` is correctly typed as `Optional[Type[DiskCache]]` to improve type safety.
-*   **`_create_session` and `_get_session_for_endpoint` `cast` Usage:** Review and remove unnecessary `cast` calls in `src/pyptine/client/base.py` if the types are correctly inferred or explicitly defined.
-*   **`json_to_dataframe` Column Renaming:** While generally fine, be aware that `col.replace("_", " ").strip()` might not handle all possible "internal prefixes" if they are not just underscores.
-*   **`json_to_dataframe` Date Parsing:** The `_parse_date_column` function is a good approach to centralize date parsing logic.
-*   **`_get_directory_size` Error Handling:** The error handling in `src/pyptine/cache/disk.py` is generally fine for a utility function.
-
-## API Documentation Alignment & Robustness
-
-These suggestions are based on comparing the `pyptine` implementation with the official INE API documentation for the Catalogue, Database, and Metadata endpoints.
-
-
-*   ~~**Refine Pagination in `DataClient.get_data_paginated`:**~~  **✅ COMPLETED**
-    *   ~~**Location:** `src/pyptine/client/data.py`~~
-    *   ~~**Details:** The Database API documentation mentions "data in chunks." Investigate the API documentation for specific pagination mechanisms (e.g., offset/limit, page numbers). Implement true pagination in `DataClient.get_data_paginated` to efficiently handle very large datasets.~~
-    *   **Implementation:** True pagination now implemented with offset/limit parameters. `get_all_data()` automatically fetches data in configurable chunks, detecting the end when fewer records than chunk_size are returned.
-*   **Robustness of List Responses (Documentation Clarification):**
-    *   **Location:** `src/pyptine/client/data.py`, `src/pyptine/client/metadata.py`
-    *   **Details:** `pyptine` has been updated to handle cases where the API returns a list instead of a dictionary for single indicator data/metadata. While the current fix works, if the API consistently returns a list for certain indicators, it might be worth clarifying this behavior in the API documentation or adapting `pyptine` to explicitly expect this for specific `varcd`s if that's the pattern.
-*   **Implement Full Dimension Validation:**
-    *   **Location:** `src/pyptine/client/data.py`
-    *   **Details:** The Database API explicitly mentions `DimX={value}` for dimension filters. `pyptine` has `DataClient.validate_dimensions` as a placeholder. Use the API documentation (for specific indicators) to implement full validation of `DimX` keys and their possible `value`s.
+1. **Retries and timeouts.** INE answers 404 for valid codes when throttling: retry 404 (an unknown code is HTTP 200 + `Sucesso.Falso`, never 404). The default 30 s timeout is short against INE's 120 s gateway. The async client has no retry at all (`max_retries` unused).
+2. **Provenance in what is written.** `extraction_date` is the parse time (wrong for a cached response): use INE's `DataExtracao`. The CSV header lacks the period(s), the dimension filter, the request URL and INE's licence credit; `INE.export_csv` also omits the date and language. `INE(cache_ttl=...)` is accepted and ignored.
+3. **Catalogue.** `<keywords>` (several CDATA sections) is never parsed, so `Indicator.keywords` is always empty. `get_main_indicators` (`opc=3`) returns Portuguese titles under `EN`; document it.
+4. **Metadata fields never sent.** `IndicatorMetadata.source`, `notes`, `description`, `theme`, `subtheme`, `geo_last_level` and the URLs are read from keys INE's metadata endpoint does not send, so they are always None. Fill them from the catalogue (`opc=1`) or drop them.
+5. **Geography.** Rows mix geographic levels (country, NUTS, municipalities). A `level` column from the `geocod` length would help; see PortugalINE.jl's "Geography traps" for the code forms (bare Census codes, NUTS III codes with letters, pseudo-units).
+6. **Examples** (`src/examples/`) use indicator `0004127`, which is not in INE's catalogue, and run the analysis methods on unfiltered data. Rewrite them against verified indicators.
+7. **Old-format parsing paths.** The parsers still accept a format INE does not serve (`dados`/`periodo`/`dimensoes`/`codigo`), and many older tests use hand-written fixtures in it. Move those tests to the recorded responses, then remove the old paths.
+8. **Package metadata.** `pyproject.toml` URLs point to `github.com/nigelrandsley/pyptine` (404; the repo is `randsley/pyptine`); the author email is not the public contact; 0.3.3 is tagged but not on PyPI.
+9. **CI.** Update actions (checkout v3, setup-python v4, codecov v3); Python 3.9 is past end of life; consider a scheduled run with live tests (the `live` marker is declared but unused).
+10. **Smaller.**
+    - `INE` builds four clients, each opening its own `DiskCache`; share one.
+    - `pivot_by_dimension`/`aggregate_by_period` default `value_column="valor"`, but rows hold `value`; list handling of `value_column`.
+    - `merge_json_files`' `merge_key` is unused.
+    - `type: ignore` at `search/catalog.py` (`get_recently_updated`); redundant `cast` calls in `client/base.py`.
+    - `COMPATIBILITY_SUMMARY.md`, `GITHUB_CHECKLIST.md`, `PROJECT_SUMMARY.md`, `PYTHON_3.14_COMPATIBILITY.md` may be stale.
