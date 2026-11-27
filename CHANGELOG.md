@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The README links to the one list of INE's verified API behaviour, kept with PortugalINE.jl's manual (https://randsley.github.io/PortugalINE.jl/dev/ine_api/), for every client of INE's API.
 - Live tests (`tests/live/`, run with `pytest -m live`): the users' paths end to end on INE's API (periods, provenance, every geographic level, districts, quarterly series, refusals, catalogue and search, CSV provenance, async against sync). They assert codes and structure, not figures. Weekly in CI (`live.yml`); deselected otherwise.
 
 ## [0.4.0] - 2026-11-27

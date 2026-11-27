@@ -248,7 +248,9 @@ filtered_response = ine.get_data(
 df_filtered = filtered_response.to_dataframe()
 ```
 
-Things INE does that are worth knowing (verified 2026-11-27):
+Things INE does that are worth knowing (verified 2026-11-27; the full list, shared with
+[PortugalINE.jl](https://github.com/randsley/PortugalINE.jl), is
+[INE's API: verified behaviour](https://randsley.github.io/PortugalINE.jl/dev/ine_api/)):
 
 - **Without `Dim1`, INE returns only the latest period.** Ask for periods explicitly, or use `get_all_data()`.
 - **One request returns every geographic level at once** (country, NUTS I/II/III, municipalities and parishes for many indicators), and some indicators add rows that are not places (residence abroad, unknown, the grand total). Filter `Dim2`, or the rows by level, before adding values up:
@@ -452,6 +454,7 @@ The main class for interacting with the INE API.
 - **GitHub Repository**: https://github.com/randsley/pyptine
 - **Issue Tracker**: https://github.com/randsley/pyptine/issues
 - **INE Portal**: https://www.ine.pt/
+- **INE's API, verified behaviour** (shared with PortugalINE.jl): https://randsley.github.io/PortugalINE.jl/dev/ine_api/
 
 ---
 
