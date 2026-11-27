@@ -129,6 +129,16 @@ FIXTURES: dict[str, tuple[str, dict[str, str], str]] = {
         },
         "live births: every geographic level and INE's pseudo-units (total, abroad, unknown)",
     ),
+    "meta_0004167_EN.json": (
+        META,
+        {"varcd": "0004167", "lang": "EN"},
+        "geography by district (Distrito/ Regiao): 2-digit codes are districts, not NUTS II",
+    ),
+    "data_0004167_S7A2025_EN.json": (
+        DATA,
+        {"op": "2", "varcd": "0004167", "lang": "EN", "Dim1": "S7A2025", "Dim3": "T", "Dim4": "T"},
+        "one year at every district and region",
+    ),
     "catalogue_opc1_0008273_EN.xml": (
         CATALOGUE,
         {"opc": "1", "varcd": "0008273", "lang": "EN"},
@@ -138,6 +148,11 @@ FIXTURES: dict[str, tuple[str, dict[str, str], str]] = {
         CATALOGUE,
         {"opc": "1", "varcd": "0008273", "lang": "PT"},
         "the same, Portuguese",
+    ),
+    "catalogue_opc1_9999999_EN.xml": (
+        CATALOGUE,
+        {"opc": "1", "varcd": "9999999", "lang": "EN"},
+        "unknown code: HTTP 200 and a Java stack trace, not XML",
     ),
 }
 # Not captured: opc=3 (488 kB) and opc=2 (13,290 indicators). tools/check_api.py checks them live.

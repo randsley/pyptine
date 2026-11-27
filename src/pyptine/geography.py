@@ -18,6 +18,14 @@ PortugalINE.jl's ``Codes`` module (its "Geography traps"), verified on INE's dat
   ``99`` is also one.
 
 Any other code is refused (``DataProcessingError``) rather than assigned the nearest level.
+
+**Two classifications.** Most indicators use NUTS for their geography (Dim2), but some use
+districts (0004167, "Distrito/ Região": ``PT``, ``1``, the districts ``01``-``18``, ``2``,
+``3``). There a two-digit code is a **district**, while under NUTS it is a NUTS II region
+(``11`` is Lisboa's district in one, Norte in the other). The codes of a single row cannot
+tell them apart, so the classification is taken from the dimension's full code list
+(:func:`classify_geography`): a district dimension always holds ``01``-``09``, and no NUTS
+II code starts with ``0`` (checked 2026-11-27).
 """
 
 from collections.abc import Iterable
@@ -29,11 +37,28 @@ COUNTRY = "country"
 NUTS1 = "nuts1"
 NUTS2 = "nuts2"
 NUTS3 = "nuts3"
+DISTRICT = "district"
 MUNICIPALITY = "municipality"
 PARISH = "parish"
 
-#: The levels of real places, largest first.
-LEVELS = (COUNTRY, NUTS1, NUTS2, NUTS3, MUNICIPALITY, PARISH)
+#: The levels of real places, largest first (district only under the district scheme).
+LEVELS = (COUNTRY, NUTS1, NUTS2, NUTS3, DISTRICT, MUNICIPALITY, PARISH)
+
+#: Classifications of a geography dimension.
+NUTS_SCHEME = "nuts"
+DISTRICT_SCHEME = "district"
+CLASSIFICATIONS = (NUTS_SCHEME, DISTRICT_SCHEME)
+
+
+def classify_geography(codes: Iterable[str]) -> str:
+    """``"district"`` if a geography dimension's codes include a district (``01``-``09``),
+    else ``"nuts"``. Pass every code of the dimension (from its metadata), not the rows of
+    one response, which a filter may have narrowed."""
+    for code in codes:
+        if len(code) == 2 and code.isdigit() and code[0] == "0":
+            return DISTRICT_SCHEME
+    return NUTS_SCHEME
+
 
 ABROAD = "abroad"
 UNKNOWN = "unknown"
@@ -78,13 +103,21 @@ def _is_dicofre(code: str) -> bool:
     )
 
 
-def geo_level(code: str) -> str:
+def geo_level(code: str, classification: str = NUTS_SCHEME) -> str:
     """The level of a place's code: one of :data:`LEVELS`.
+
+    Args:
+        code: INE's ``geocod``
+        classification: ``"nuts"`` (default) or ``"district"`` (see :func:`classify_geography`)
 
     Raises:
         DataProcessingError: If ``code`` is a pseudo-unit (see :func:`pseudo_unit`) or not a
-            code INE issues
+            code INE issues, or the classification is unknown
     """
+    if classification not in CLASSIFICATIONS:
+        raise DataProcessingError(
+            f"Unknown geography classification {classification!r}; use {CLASSIFICATIONS}"
+        )
     kind = pseudo_unit(code)
     if kind is not None:
         raise DataProcessingError(f"{code!r} is not a place: INE uses it for {kind}")
@@ -92,7 +125,15 @@ def geo_level(code: str) -> str:
     if n == 1:
         return NUTS1
     if n == 2:
-        return COUNTRY if code == "PT" else NUTS2
+        if code == "PT":
+            return COUNTRY
+        if classification == DISTRICT_SCHEME:
+            if code.isdigit() and 1 <= int(code) <= 18:
+                return DISTRICT
+            raise DataProcessingError(
+                f"Not a district code: {code!r} (the mainland districts are 01-18)"
+            )
+        return NUTS2
     if n == 3:
         return NUTS3
     if n == 7:
@@ -119,17 +160,17 @@ def geo_level(code: str) -> str:
     )
 
 
-def level_or_pseudo(code: str) -> str:
+def level_or_pseudo(code: str, classification: str = NUTS_SCHEME) -> str:
     """:func:`geo_level`, or the pseudo-unit's kind (``abroad``, ``unknown``, ``total``)."""
-    return pseudo_unit(code) or geo_level(code)
+    return pseudo_unit(code) or geo_level(code, classification)
 
 
-def check_codes(codes: Iterable[str]) -> None:
+def check_codes(codes: Iterable[str], classification: str = NUTS_SCHEME) -> None:
     """Refuse every code that is neither a place nor a pseudo-unit, naming them all."""
     bad = []
     for code in dict.fromkeys(codes):
         try:
-            level_or_pseudo(code)
+            level_or_pseudo(code, classification)
         except DataProcessingError:
             bad.append(code)
     if bad:

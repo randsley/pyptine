@@ -1,165 +1,70 @@
-"""Advanced filtering and data manipulation examples for the pyptine library."""
+"""Filtering, geographic levels, several codes per dimension, and exports.
+
+Indicators used (verified 2026-11-27):
+- 0008273 resident population by NUTS region and municipality (annual, 2011-2023)
+- 0012234 median value of dwelling sales (quarterly; Dim3 H1 total, H11 new, H12 existing)
+- 0011776 printed edited books by language (annual)
+
+Source: Statistics Portugal (INE), https://www.ine.pt.
+"""
+
+import pandas as pd
 
 from pyptine import INE
-from pyptine.processors.dataframe import (
-    filter_by_geography,
-)
+from pyptine.processors.excel import export_multiple_sheets
+from pyptine.utils.exceptions import DimensionError, INERefusalError
 
-# Initialize the client
 ine = INE(language="EN")
 
-print("=" * 60)
-print("Advanced Filtering and Data Processing Examples")
-print("=" * 60)
 
-# --- Example 1: Using an indicator with time series data ---
-print("\n" + "=" * 60)
-print("Example 1: Working with GDP Time Series Data")
-print("=" * 60)
-varcd_gdp = "0011776"  # GDP indicator
-print(f"Fetching data for indicator {varcd_gdp}...")
-response_gdp = ine.get_data(varcd_gdp)
-df_gdp = response_gdp.to_dataframe()
-print(f"Data shape: {df_gdp.shape}")
-print(f"Columns: {list(df_gdp.columns)}")
-print("\nFirst 5 rows:")
-print(df_gdp.head())
+def section(title: str) -> None:
+    print("\n" + "=" * 70 + f"\n{title}\n" + "=" * 70)
 
-# --- Example 2: Geographic Filtering ---
-print("\n" + "=" * 60)
-print("Example 2: Filter by Geographic Area")
-print("=" * 60)
-varcd = "0004167"  # Resident population
-response = ine.get_data(varcd, dimensions={"Dim1": "S7A2023"})  # Year 2023
-df = response.to_dataframe()
 
-if "geodsg" in df.columns:
-    geography_to_filter = "Lisboa"
-    print(f"Filtering data for geography containing '{geography_to_filter}'...")
-    lisboa_df = filter_by_geography(df, geography_to_filter, geography_column="geodsg")
-    print(f"Found {len(lisboa_df)} rows for '{geography_to_filter}'.")
-    print(lisboa_df.head())
-else:
-    print("Skipping: 'geodsg' column not found for geographic filtering.")
+section("1. Several codes per dimension (a list, or a comma-separated string)")
+r = ine.get_data("0012234", {"Dim1": "S5A20261", "Dim2": ["PT", "11", "1A"], "Dim3": "H11,H12"})
+df = r.to_dataframe()
+print(df.pivot(index="geodsg", columns="dim_3_t", values="value"))
 
-# --- Example 3: Exploring Dimensions ---
-print("\n" + "=" * 60)
-print("Example 3: Explore Indicator Dimensions")
-print("=" * 60)
-print(f"Getting dimensions for indicator {varcd}...")
-dimensions = ine.get_dimensions(varcd)
-for dim in dimensions:
-    print(f"\nDimension {dim.id}: {dim.name}")
-    print(f"  - Total values: {len(dim.values)}")
-    print(f"  - Sample values: {[f'{v.code}: {v.label}' for v in dim.values[:3]]}")
+section("2. Every geographic level in one request")
+r = ine.get_data("0008273", {"Dim1": "S7A2023", "Dim3": "T", "Dim4": "T"})
+levels = pd.Series([row["geo_level"] for row in r.with_geo_level().data]).value_counts()
+print(levels.to_string())
+# Adding all rows would count each person several times; pick one level first.
+munis = r.at_level("municipality")
+print(f"Sum over municipalities: {sum(x['value'] for x in munis.data):,.0f}")
+print(f"Portugal:                {r.at_level('country').data[0]['value']:,.0f}")
 
-# --- Example 4: Filtering with Multiple Dimensions ---
-print("\n" + "=" * 60)
-print("Example 4: Multi-Dimension Filtering")
-print("=" * 60)
-print("Fetching data filtered by year, region, and sex...")
-filtered_response = ine.get_data(
-    varcd,
-    dimensions={
-        "Dim1": "S7A2023",  # Year 2023
-        "Dim2": "PT",  # Portugal
-        "Dim3": "T",  # Total (both sexes)
-    },
+section("3. The largest municipalities (by code, never by name)")
+top = sorted(munis.data, key=lambda x: -x["value"])[:5]
+for row in top:
+    print(f"- {row['geocod']} {row['geodsg']}: {row['value']:,.0f}")
+
+section("4. Extra dimensions appear as dim_<n> (code) and dim_<n>_t (label)")
+r = ine.get_data("0011776", {"Dim1": "S7A2025"})
+print(r.to_dataframe()[["dim_3", "dim_3_t", "value"]].head(6).to_string(index=False))
+
+section("5. Mistakes are refused with the reason")
+try:
+    ine.get_data("0012234", {"Dim1": "S5A20261", "Dim2": "PT", "Dim3": "H.1"})
+except DimensionError as e:  # categ_cod instead of the code INE filters by
+    print(f"DimensionError: {e}")
+try:
+    ine.get_data("0008273", {"Dim1": "2022"})
+except DimensionError as e:  # a period label instead of its code
+    print(f"DimensionError: {e}")
+try:
+    ine.get_data("9999999")
+except INERefusalError as e:
+    print(f"INERefusalError: {e}")
+
+section("6. Exports carry provenance")
+sales = ine.get_data("0012234", {"Dim1": ["S5A20254", "S5A20261"], "Dim2": "PT", "Dim3": "H1"})
+sales.to_json("dwelling_sales.json")
+sales.to_excel("dwelling_sales.xlsx")  # a Data sheet and a Provenance sheet (needs openpyxl)
+export_multiple_sheets(
+    {"municipalities": munis, "dwelling sales": sales},
+    "combined.xlsx",  # one Provenance column per sheet
 )
-filtered_df = filtered_response.to_dataframe()
-print(f"Filtered data shape: {filtered_df.shape}")
-print(filtered_df)
-
-# --- Example 5: Batch Search and Export ---
-print("\n" + "=" * 60)
-print("Example 5: Batch Search and Export to JSON")
-print("=" * 60)
-search_term = "employment rate"
-print(f"Searching for indicators matching '{search_term}'...")
-results = ine.search(search_term)
-print(f"Found {len(results)} indicators. Exporting first 2...")
-
-for i, indicator in enumerate(results[:2], 1):
-    output_file = f"advanced_export_{indicator.varcd}.json"
-    try:
-        print(f"  {i}. Exporting '{indicator.title[:50]}...' ({indicator.varcd})")
-        ine.export_json(indicator.varcd, output_file, pretty=False)
-        print(f"      -> Saved to {output_file}")
-    except Exception as e:
-        print(f"      -> Failed: {e}")
-
-# --- Example 6: Working with Multiple Data Formats ---
-print("\n" + "=" * 60)
-print("Example 6: Data Format Comparison")
-print("=" * 60)
-print(f"Fetching data for {varcd} in multiple formats...")
-response_formats = ine.get_data(varcd, dimensions={"Dim1": "S7A2023"})
-
-# To DataFrame
-df_format = response_formats.to_dataframe()
-print(f"- As DataFrame: {type(df_format)}, shape: {df_format.shape}")
-
-# To Dictionary
-dict_format = response_formats.to_dict()
-print(f"- As Dictionary: {type(dict_format)}, keys: {list(dict_format.keys())}")
-print(f"  - Data points: {len(dict_format['data'])}")
-
-# Get JSON representation
-json_dict = response_formats.model_dump_json(indent=2)
-print(f"- As JSON string: {type(json_dict)}, length: {len(json_dict)} chars")
-
-# --- Example 7: Exporting with Metadata ---
-print("\n" + "=" * 60)
-print("Example 7: Export with Full Metadata")
-print("=" * 60)
-output_file = "population_with_metadata.csv"
-print(f"Exporting data with full metadata to '{output_file}'...")
-ine.export_csv(varcd, output_file, include_metadata=True, dimensions={"Dim1": "S7A2023"})
-print(f"Successfully exported to '{output_file}'")
-print("The CSV file includes metadata as comments at the top.")
-
-# --- Example 8: Compare Multiple Indicators ---
-print("\n" + "=" * 60)
-print("Example 8: Compare Multiple Indicators")
-print("=" * 60)
-print("Fetching metadata for multiple related indicators...")
-population_indicators = ["0004167", "0007533"]  # Population, Deaths
-
-for ind_code in population_indicators:
-    try:
-        metadata = ine.get_metadata(ind_code)
-        print(f"\n{ind_code}: {metadata.title[:60]}...")
-        print(f"  - Unit: {metadata.unit}")
-        print(f"  - Periodicity: {metadata.periodicity}")
-        print(f"  - Dimensions: {len(metadata.dimensions)}")
-    except Exception as e:
-        print(f"\n{ind_code}: Error - {e}")
-
-# --- Example 9: Cache Management ---
-print("\n" + "=" * 60)
-print("Example 9: Cache Management")
-print("=" * 60)
-cache_info = ine.get_cache_info()
-print("Current cache info:")
-print(f"  - Enabled: {cache_info['enabled']}")
-if cache_info["enabled"]:
-    print("  - Metadata cache and data cache are active")
-    print("  - Metadata cached for 7 days, data for 1 day")
-# To clear cache: ine.clear_cache()
-
-# --- Example 10: Theme-based Discovery ---
-print("\n" + "=" * 60)
-print("Example 10: Theme-based Indicator Discovery")
-print("=" * 60)
-themes = ine.list_themes()
-print(f"Available themes: {len(themes)}")
-print("\nSearching within 'Population' theme:")
-pop_indicators = ine.search("", theme="Population")
-print(f"Found {len(pop_indicators)} indicators in Population theme")
-print("Sample indicators:")
-for indicator in pop_indicators[:3]:
-    print(f"  - {indicator.varcd}: {indicator.title[:50]}...")
-
-print("\n" + "=" * 60)
-print("All advanced examples completed!")
-print("=" * 60)
+print("Wrote dwelling_sales.json, dwelling_sales.xlsx, combined.xlsx")
+print(f"Cite: {sales.citation}")

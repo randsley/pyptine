@@ -734,13 +734,49 @@ class TestGeography:
         assert sum(row["value"] for row in munis.data) == r.at_level("country").data[0]["value"]
         assert len(r.at_level("nuts1", "nuts2").data) == 10
 
+    def test_district_classification(self, rsps):
+        """0004167 uses districts: "11" is Lisboa's district there, Norte (NUTS II) elsewhere."""
+        from collections import Counter
+
+        serve(rsps, "meta_0004167_EN.json", "data_0004167_S7A2025_EN.json")
+        r = client().get_data("0004167", {"Dim1": "S7A2025", "Dim3": "T", "Dim4": "T"})
+        assert r.geo_classification == "district"
+        tagged = {row["geocod"]: row["geo_level"] for row in r.with_geo_level().data}
+        assert tagged["11"] == "district"
+        assert tagged["01"] == "district"
+        assert tagged["1"] == "nuts1" and tagged["2"] == "nuts1" and tagged["3"] == "nuts1"
+        assert tagged["PT"] == "country"
+        assert Counter(tagged.values()) == {"district": 18, "nuts1": 3, "country": 1}
+        districts = r.at_level("district")
+        mainland = r.at_level("nuts1").data
+        assert sum(row["value"] for row in districts.data) == next(
+            row["value"] for row in mainland if row["geocod"] == "1"
+        )
+
+    def test_nuts_classification(self, rsps):
+        serve(rsps, "meta_0008273_EN.json", "data_0008273_latest_EN.json")
+        assert client().get_data("0008273", TOTAL).geo_classification == "nuts"
+
+    def test_classify_geography(self):
+        from pyptine.geography import classify_geography, geo_level
+        from pyptine.utils.exceptions import DataProcessingError
+
+        assert classify_geography(["PT", "1", "11", "11A"]) == "nuts"
+        assert classify_geography(["PT", "1", "01", "11"]) == "district"
+        assert geo_level("11") == "nuts2"
+        assert geo_level("11", "district") == "district"
+        with pytest.raises(DataProcessingError, match="Not a district code"):
+            geo_level("19", "district")
+        with pytest.raises(DataProcessingError, match="Unknown geography classification"):
+            geo_level("11", "county")
+
     def test_at_level_arguments(self, rsps):
         serve(rsps, "meta_0008273_EN.json", "data_0008273_latest_EN.json")
         r = client().get_data("0008273", TOTAL)
         with pytest.raises(ValueError, match="at least one"):
             r.at_level()
         with pytest.raises(ValueError, match="Unknown level"):
-            r.at_level("district")
+            r.at_level("county")
 
     def test_row_without_geocod_refused(self):
         from pyptine.models.response import DataResponse
@@ -748,7 +784,75 @@ class TestGeography:
 
         r = DataResponse(varcd="0008273", title="t", language="EN", data=[{"value": 1.0}])
         with pytest.raises(DataProcessingError, match="no geocod"):
+            r.with_geo_level(classification="nuts")
+        with pytest.raises(DataProcessingError, match="classification"):
             r.with_geo_level()
+
+
+class TestCatalogueUnknownCode:
+    """The catalogue answers a code it does not hold with HTTP 200 and a Java stack trace
+    (recorded: the short form INE sends once the JVM omits the trace). Refused at once."""
+
+    def serve_error(self, rsps):
+        base, params, body = recorded("catalogue_opc1_9999999_EN.xml")
+        rsps.add(
+            responses.GET,
+            base,
+            body=body,
+            content_type="text/xml;charset=UTF-8",
+            match=[matchers.query_param_matcher(params)],
+        )
+        return body
+
+    def test_refused_not_retried(self, rsps):
+        from pyptine.client.catalogue import CatalogueClient
+
+        self.serve_error(rsps)
+        with pytest.raises(INERefusalError, match="NullPointerException.*not in INE's catalogue"):
+            CatalogueClient(cache_enabled=False).get_indicator("9999999")
+        assert len(rsps.calls) == 1
+
+    def test_not_cached(self, rsps, tmp_path):
+        from pyptine.client.catalogue import CatalogueClient
+
+        self.serve_error(rsps)
+        self.serve_error(rsps)
+        c = CatalogueClient(cache_enabled=True, cache_dir=tmp_path)
+        for _ in range(2):
+            with pytest.raises(INERefusalError):
+                c.get_indicator("9999999")
+        assert len(rsps.calls) == 2  # asked again: the error page was not cached
+        c.close()
+
+    def test_detection(self):
+        from pyptine.client.parsing import java_error
+
+        body = (FIXTURES / "catalogue_opc1_9999999_EN.xml").read_bytes()
+        assert java_error(body) == "java.lang.NullPointerException"
+        # The long form INE also sends: the same start, then the stack trace.
+        assert java_error(body.replace(b"\n</pre>", b"\n\tat netgest.bo.ql.QLParser")) == (
+            "java.lang.NullPointerException"
+        )
+        assert java_error((FIXTURES / "catalogue_opc1_0008273_EN.xml").read_bytes()) is None
+
+    async def test_async(self):
+        from pyptine.client.async_base import AsyncINEClient
+
+        body = (FIXTURES / "catalogue_opc1_9999999_EN.xml").read_bytes()
+        calls = []
+
+        def handler(request):
+            calls.append(request)
+            return httpx.Response(200, content=body, headers={"content-type": "text/xml"})
+
+        c = AsyncINEClient()
+        c.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        with pytest.raises(INERefusalError, match="NullPointerException"):
+            await c._make_request(
+                "/ine/xml_indic.jsp", {"opc": "1", "varcd": "9999999"}, response_format="xml"
+            )
+        assert len(calls) == 1
+        await c.client.aclose()
 
 
 class TestExcelProvenance:
@@ -851,6 +955,16 @@ def responses_query(url: str) -> dict[str, str]:
     from urllib.parse import parse_qsl, urlsplit
 
     return dict(parse_qsl(urlsplit(url).query))
+
+
+def test_plot_title_override(rsps):
+    """A caller's title replaces the indicator's (it used to raise TypeError)."""
+    serve(rsps, "meta_0008273_EN.json", "data_0008273_S7A2021_S7A2022_EN.json")
+    r = client().get_data("0008273", {"Dim1": ["S7A2021", "S7A2022"], **TOTAL})
+    for method in ("plot_line", "plot_bar", "plot_area", "plot_scatter"):
+        assert getattr(r, method)(title="Mine").layout.title.text == "Mine"
+        assert getattr(r, method)().layout.title.text == r.title
+    assert r.plot(chart_type="bar", title="Mine").layout.title.text == "Mine"
 
 
 class TestAsync:

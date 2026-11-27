@@ -17,6 +17,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Callable, Optional, Union
 
+from pyptine.geography import classify_geography
 from pyptine.models.indicator import Dimension, IndicatorMetadata
 from pyptine.models.response import DataResponse
 from pyptine.provenance import parse_extraction_date
@@ -38,6 +39,37 @@ _SUPPRESSION_MARKERS = {"", "-", "x", "//", "...", "..", "§", "o"}
 def is_refusal_body(content: bytes) -> bool:
     """True if a raw response body is an INE refusal (used to keep refusals out of the cache)."""
     return bool(_REFUSAL.search(content))
+
+
+# The catalogue (xml_indic.jsp) answers a code it does not hold with HTTP 200 and a Java
+# stack trace instead of XML: "<pre>java.lang.NullPointerException\n\tat netgest.bo...".
+# Verified 2026-11-27 for 0004127 and 9999999 (opc=1, either language).
+_JAVA_ERROR = re.compile(rb"^\s*<pre>\s*(java\.[\w.$]+(?:Exception|Error))")
+
+
+def java_error(content: bytes) -> Optional[str]:
+    """The Java exception name if ``content`` is INE's error page, else None."""
+    m = _JAVA_ERROR.match(content[:500])
+    return m.group(1).decode("ascii", "replace") if m else None
+
+
+def check_catalogue_body(content: bytes, varcd: str = "", url: str = "") -> None:
+    """Raise INERefusalError if the catalogue answered with its Java error page.
+
+    INE does this, deterministically, for a code that is not in its catalogue, so it is
+    refused at once (not retried as a malformed body) and never cached.
+    """
+    exception = java_error(content)
+    if exception is not None:
+        raise INERefusalError(
+            varcd=varcd,
+            ine_code="",
+            ine_message=(
+                f"the catalogue answered with a server error page ({exception}) instead of "
+                "XML, which is how it answers a code that is not in INE's catalogue"
+            ),
+            url=url,
+        )
 
 
 def check_success(body: Any, varcd: str = "", url: str = "") -> None:
@@ -233,6 +265,7 @@ def parse_data_response(
     extracted = None
     last_updated: Optional[str] = None
     metadata_url: Optional[str] = None
+    geo_classification: Optional[str] = None
 
     def meta() -> Optional[IndicatorMetadata]:
         nonlocal metadata
@@ -276,6 +309,9 @@ def parse_data_response(
                         f"Period codes for {varcd} need its metadata, which is not available"
                     )
                 lookup = _period_lookup(md)
+                geo = [d for d in md.dimensions if d.id == 2]
+                if geo:  # Dim2 is geography; its full code list tells NUTS from districts
+                    geo_classification = classify_geography(v.code for v in geo[0].values)
                 for label, period_rows in dados.items():
                     code = lookup.get(label)
                     if code is None:
@@ -318,6 +354,7 @@ def parse_data_response(
         extraction_date=extracted,
         last_updated=last_updated,
         metadata_url=metadata_url,
+        geo_classification=geo_classification,
         url=url,
         dimensions=dict(dimensions or {}),
     )

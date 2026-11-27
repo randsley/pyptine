@@ -1,108 +1,78 @@
-"""Basic usage examples for the pyptine library."""
+"""Basic usage of pyptine.
+
+Indicators used (all verified against INE's catalogue, 2026-11-27):
+- 0004167 resident population by district/region, sex and age group (annual, 1991-2025)
+- 0008273 resident population by NUTS region and municipality (annual, 2011-2023)
+
+Source: Statistics Portugal (INE), https://www.ine.pt. Reuse is permitted on condition that
+the source is cited; every file written below carries the citation.
+"""
 
 from pyptine import INE
 
-# Initialize the client. Caching is enabled by default.
-ine = INE(language="EN")
+ine = INE(language="EN")  # caching is on by default
 
-print("=" * 60)
-print("Example 1: Search for indicators by keyword")
-print("=" * 60)
-results = ine.search("gdp")
-print(f"Found {len(results)} indicators for 'gdp':")
-for indicator in results[:5]:  # Print top 5 results
-    print(f"- {indicator.varcd}: {indicator.title} (Theme: {indicator.theme})")
 
-print("\n" + "=" * 60)
-print("Example 2: Get detailed metadata for an indicator")
-print("=" * 60)
-varcd = "0004167"  # Resident population
-metadata = ine.get_metadata(varcd)
-print(f"Metadata for indicator {metadata.varcd}:")
-print(f"- Title: {metadata.title}")
-print(f"- Unit: {metadata.unit}")
-print(f"- Source: {metadata.source}")
-print(f"- Dimensions: {len(metadata.dimensions)}")
+def section(title: str) -> None:
+    print("\n" + "=" * 70 + f"\n{title}\n" + "=" * 70)
 
-print("\n" + "=" * 60)
-print("Example 3: Explore indicator dimensions")
-print("=" * 60)
-dimensions = ine.get_dimensions(varcd)
-for dim in dimensions:
-    print(f"\nDimension '{dim.name}' (ID: {dim.id}) has {len(dim.values)} values.")
-    print("  Sample values:")
-    for value in dim.values[:3]:
-        print(f"  - Code: {value.code}, Label: {value.label}")
 
-print("\n" + "=" * 60)
-print("Example 4: Get data and convert to a pandas DataFrame")
-print("=" * 60)
-response = ine.get_data(varcd)
-df = response.to_dataframe()
-print("Data converted to DataFrame:")
-print(f"- Shape: {df.shape}")
-print(f"- Columns: {list(df.columns)}")
-print("First 5 rows:")
-print(df.head())
+section("1. Search the catalogue")
+results = ine.search("resident population")
+print(f"{len(results)} indicators match 'resident population'; the first five:")
+for indicator in results[:5]:
+    print(f"- {indicator.varcd}: {indicator.title} (theme: {indicator.theme})")
 
-print("\n" + "=" * 60)
-print("Example 5: Filter data using dimensions")
-print("=" * 60)
-# Use a dimension code from the metadata explored in Example 3
-# For indicator 0004167, Dim1 is 'Period' and Dim2 is 'Geographic localization'
-# Note: Dimension values use specific codes (e.g., 'S7A2023' for year 2023, 'PT' for Portugal)
-dimension_filter = {"Dim1": "S7A2023", "Dim2": "PT"}  # Year 2023, Region 'Portugal'
-print(f"Fetching data with filter: {dimension_filter}...")
-filtered_response = ine.get_data(varcd, dimensions=dimension_filter)
-filtered_df = filtered_response.to_dataframe()
-print("Filtered DataFrame:")
-print(f"- Shape: {filtered_df.shape}")
-print(filtered_df.head())
+section("2. Metadata of one indicator")
+varcd = "0004167"
+metadata = ine.get_metadata(varcd)  # also fills theme, source, ... from the catalogue
+print(f"{metadata.varcd}: {metadata.title}")
+print(f"- unit: {metadata.unit}; periodicity: {metadata.periodicity}")
+print(f"- theme: {metadata.theme} / {metadata.subtheme}")
+print(f"- source: {metadata.source}")
 
-print("\n" + "=" * 60)
-print("Example 6: Export data directly to a CSV file")
-print("=" * 60)
-output_csv_file = "population_data.csv"
-print(f"Exporting data for {varcd} to '{output_csv_file}'...")
-ine.export_csv(varcd, output_csv_file, include_metadata=True)
-print(f"Successfully exported to '{output_csv_file}'.")
+section("3. Dimensions and their codes")
+# Filters take the codes (DimensionValue.code), never the labels: Dim1 "S7A2023", not "2023".
+for dim in ine.get_dimensions(varcd):
+    sample = ", ".join(f"{v.code}={v.label}" for v in dim.values[:4])
+    print(f"Dim{dim.id} {dim.name}: {len(dim.values)} values ({sample}, ...)")
 
-print("\n" + "=" * 60)
-print("Example 7: List all available themes")
-print("=" * 60)
+section("4. One figure: Portugal, both sexes, all ages, 2025")
+# Without Dim1 INE returns only the latest period; without the other filters, every region,
+# sex and age group. Pin each dimension to get one series.
+total = {"Dim2": "PT", "Dim3": "T", "Dim4": "T"}
+r = ine.get_data(varcd, {"Dim1": "S7A2025", **total})
+print(r.to_dataframe()[["period", "period_code", "geodsg", "value"]])
+
+section("5. Several periods in one request")
+r = ine.get_data(varcd, {"Dim1": ["S7A2015", "S7A2020", "S7A2025"], **total})
+for row in r.data:
+    print(f"{row['period']}: {row['value']:,.0f}")
+
+section("6. Geographic levels")
+# One request returns every level at once; the level comes from the codes. In 0004167 a
+# two-digit code is a district (in NUTS indicators it is a NUTS II region).
+r = ine.get_data(varcd, {"Dim1": "S7A2025", "Dim3": "T", "Dim4": "T"})
+districts = r.at_level("district")
+print(f"{len(districts.data)} districts; the three largest:")
+for row in sorted(districts.data, key=lambda x: -x["value"])[:3]:
+    print(f"- {row['geodsg']}: {row['value']:,.0f}")
+
+munis = ine.get_data("0008273", {"Dim1": "S7A2023", "Dim3": "T", "Dim4": "T"})
+print(f"0008273 in 2023: {len(munis.at_level('municipality').data)} municipalities")
+
+section("7. Export with provenance")
+r = ine.get_data(varcd, {"Dim1": ["S7A2024", "S7A2025"], **total})
+r.to_csv("population_portugal.csv")  # the header carries source, licence, URL, INE's date
+print("Wrote population_portugal.csv")
+print(f"Cite: {r.citation}")
+
+section("8. Themes")
 themes = ine.list_themes()
-print(f"Found {len(themes)} themes. First 10:")
-for theme in themes[:10]:
-    print(f"- {theme}")
+print(f"{len(themes)} themes, e.g. {', '.join(themes[:5])}")
+labour = ine.search(query="", theme="Labour market")
+print(f"{len(labour)} indicators in 'Labour market', e.g. {labour[0].varcd}: {labour[0].title}")
 
-print("\n" + "=" * 60)
-print("Example 8: Search for indicators within a specific theme")
-print("=" * 60)
-theme_to_search = "Labour market"
-print(f"Searching for indicators in theme '{theme_to_search}'...")
-theme_indicators = ine.search(query="", theme=theme_to_search)
-print(f"Found {len(theme_indicators)} indicators in the '{theme_to_search}' theme.")
-for indicator in theme_indicators[:3]:
-    print(f"- {indicator.varcd}: {indicator.title}")
-
-print("\n" + "=" * 60)
-print("Example 9: Manage the cache")
-print("=" * 60)
-cache_info = ine.get_cache_info()
-print("Current cache info:")
-print(cache_info)
-# To clear the cache, you would run:
-# ine.clear_cache()
-# print("\nCache cleared.")
-
-print("\n" + "=" * 60)
-print("Example 10: Validate an indicator code")
-print("=" * 60)
-valid_code = "0004167"
-invalid_code = "9999999"
-print(f"Is '{valid_code}' a valid indicator code? {ine.validate_indicator(valid_code)}")
-print(f"Is '{invalid_code}' a valid indicator code? {ine.validate_indicator(invalid_code)}")
-
-print("\n" + "=" * 60)
-print("All examples completed!")
-print("=" * 60)
+section("9. Validate codes")
+for code in (varcd, "9999999"):
+    print(f"{code}: {'valid' if ine.validate_indicator(code) else 'not in the catalogue'}")

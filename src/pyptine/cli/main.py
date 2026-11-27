@@ -266,7 +266,7 @@ def download(
     Examples:
         pyptine download 0004167
         pyptine download 0004167 --output data.csv
-        pyptine download 0004167 --format json
+        pyptine download 0004167 -f json
         pyptine download 0008273 --dimension "Dim1=S7A2021,S7A2022" -d Dim2=PT
     """
     ine = INE(language=lang, cache=True)

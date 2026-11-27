@@ -113,6 +113,27 @@
       "captured": "2026-11-27T18:36:52+00:00",
       "sha256": "5841dcf9795eb19cc85b0419135d65ee933d92b2d10bda6839fccaeac0ca217c",
       "bytes": 3736
+    },
+    "catalogue_opc1_9999999_EN.xml": {
+      "url": "https://www.ine.pt/ine/xml_indic.jsp?opc=1&varcd=9999999&lang=EN",
+      "purpose": "unknown code: HTTP 200 and a Java stack trace, not XML",
+      "captured": "2026-11-27T18:45:18+00:00",
+      "sha256": "c2fba5fc47b385be0736f6cc79e0cb10580e61868dbd0862bc70c3a15930da9b",
+      "bytes": 63
+    },
+    "meta_0004167_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=0004167&lang=EN",
+      "purpose": "geography by district (Distrito/ Regiao): 2-digit codes are districts, not NUTS II",
+      "captured": "2026-11-27T18:53:17+00:00",
+      "sha256": "6f70a218d976aad56d5a1dd2aa2bec0a10b8293c124213c8498a30d49fe508c0",
+      "bytes": 16008
+    },
+    "data_0004167_S7A2025_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0004167&lang=EN&Dim1=S7A2025&Dim3=T&Dim4=T",
+      "purpose": "one year at every district and region",
+      "captured": "2026-11-27T18:53:18+00:00",
+      "sha256": "1b4caa8eced8fe9906343e664f151444897071f78e38c2e17fb3316ac3739323",
+      "bytes": 5217
     }
   }
 }

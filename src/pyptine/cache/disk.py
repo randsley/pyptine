@@ -17,12 +17,16 @@ logger = logging.getLogger(__name__)
 # A refusal's key as INE writes it ('"Falso" : ['). Same test as
 # pyptine.client.parsing.is_refusal_body, repeated here to keep the cache free of client imports.
 _REFUSAL = re.compile(rb'"Falso"\s*:')
+# The catalogue's Java error page for an unknown code (pyptine.client.parsing.java_error).
+_JAVA_ERROR = re.compile(rb"^\s*<pre>\s*java\.")
 
 
 def _cacheable(response: Any) -> bool:
-    """False for an INE refusal (HTTP 200 with Sucesso.Falso), which must not be cached."""
+    """False for an INE refusal (HTTP 200 with Sucesso.Falso, or the catalogue's Java
+    error page for an unknown code), which must not be cached."""
     try:
-        return not _REFUSAL.search(response.content or b"")
+        content = response.content or b""
+        return not (_REFUSAL.search(content) or _JAVA_ERROR.match(content[:500]))
     except Exception:  # an unreadable body is not worth caching either
         return False
 

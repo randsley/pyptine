@@ -11,7 +11,7 @@ import httpx
 
 from pyptine.__version__ import __version__
 from pyptine.client import retry
-from pyptine.client.parsing import check_success
+from pyptine.client.parsing import check_catalogue_body, check_success
 from pyptine.utils.exceptions import APIError, RateLimitError
 
 logger = logging.getLogger(__name__)
@@ -156,6 +156,8 @@ class AsyncINEClient:
         if status >= 400:
             raise APIError(status, f"HTTP {status} for {response.url}")
 
+        if response_format == "xml":
+            check_catalogue_body(response.content, str(params.get("varcd", "")), str(response.url))
         try:
             if response_format == "json":
                 body: Union[dict[str, Any], str] = self._parse_json_response(response)

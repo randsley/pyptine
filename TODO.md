@@ -16,6 +16,8 @@ ignores `start`/`count`). Ordered by effect on users.
 - Weekly API-drift check; offline tests pinned against recorded INE responses.
 - Retries (404 throttling, 429 with Retry-After, 5xx, resets, malformed bodies; 5/20/60 s) and a 130 s read timeout, sync and async.
 - Provenance in what is written: INE's `DataExtracao`, request URL, filters, periods, licence and citation in `DataResponse`, the CSV header and JSON; `cache_ttl` honoured. Excel export with a Provenance sheet; the catalogue's date is INE's.
+- Examples rewritten against verified indicators; each runs end to end.
+- District geographies (0004167) told from NUTS; the catalogue's Java error page for unknown codes refused at once.
 - Geographic levels from codes: `DataResponse.with_geo_level()` / `at_level()`.
 - Metadata's catalogue-only fields filled from `opc=1` by `INE.get_metadata`; `notes` removed.
 - Catalogue keywords parsed (split on CDATA boundaries); `opc=3`'s Portuguese titles documented.
@@ -23,13 +25,14 @@ ignores `start`/`count`). Ordered by effect on users.
 
 ## Open
 
-1. **Examples** (`src/examples/`) use indicator `0004127`, which is not in INE's catalogue, and run the analysis methods on unfiltered data. Rewrite them against verified indicators.
-2. **Old-format parsing paths.** The parsers still accept a format INE does not serve (`dados`/`periodo`/`dimensoes`/`codigo`), and many older tests use hand-written fixtures in it. Move those tests to the recorded responses, then remove the old paths.
-3. **Package metadata.** `pyproject.toml` URLs point to `github.com/nigelrandsley/pyptine` (404; the repo is `randsley/pyptine`); the author email is not the public contact; 0.3.3 is tagged but not on PyPI.
-4. **CI.** Update actions (checkout v3, setup-python v4, codecov v3); Python 3.9 is past end of life; consider a scheduled run with live tests (the `live` marker is declared but unused).
-5. **Smaller.**
+1. **Old-format parsing paths.** The parsers still accept a format INE does not serve (`dados`/`periodo`/`dimensoes`/`codigo`), and many older tests use hand-written fixtures in it. Move those tests to the recorded responses, then remove the old paths.
+2. **Package metadata.** `pyproject.toml` URLs point to `github.com/nigelrandsley/pyptine` (404; the repo is `randsley/pyptine`); the author email is not the public contact; 0.3.3 is tagged but not on PyPI.
+3. **CI.** Update actions (checkout v3, setup-python v4, codecov v3); Python 3.9 is past end of life; consider a scheduled run with live tests (the `live` marker is declared but unused).
+4. **Smaller.**
     - The CLI's `search --timeout` defaults to 10 s (the catalogue download takes ~20 s; the timeout is per read, so it works, but the help text says "Request timeout").
     - The catalogue's `<extraction_date>` has no timezone. On 2026-11-27 it matched the data endpoint's UTC `DataExtracao`, but Lisbon is UTC+0 then: compare again in summer (after 2027-03-28) to learn whether it is UTC or Lisbon time.
+    - `ine_citation` lists every period; a long contiguous run (27 quarters) could be written as a range.
+    - `CatalogueClient.get_indicator` logs at ERROR before re-raising, so `validate_indicator` on an unknown code prints an error line.
     - `INE` builds four clients, each opening its own `DiskCache`; share one.
     - `pivot_by_dimension`/`aggregate_by_period` default `value_column="valor"`, but rows hold `value`; list handling of `value_column`.
     - `merge_json_files`' `merge_key` is unused.

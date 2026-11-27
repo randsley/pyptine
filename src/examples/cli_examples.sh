@@ -34,14 +34,20 @@ echo -e "\n# 7. View available dimensions for an indicator"
 pyptine dimensions 0004167
 
 # --- Downloading Data ---
-echo -e "\n# 8. Download data to a CSV file (default format)"
-pyptine download 0004167 --output population_data.csv
+# Without Dim1 INE returns only the latest period; without the other filters, every region,
+# sex and age group. Codes come from `pyptine dimensions` (Dim1 S7A2025, not 2025).
+echo -e "
+# 8. Download the latest period to CSV (the header carries the provenance)"
+pyptine download 0004167 --output population_latest.csv
 
-echo -e "\n# 9. Download data as a JSON file"
-pyptine download 0004167 --output population_data.json --output-format json
+echo -e "
+# 9. Download one series: Portugal, both sexes, all ages, three years"
+pyptine download 0004167 --output population_portugal.csv     -d "Dim1=S7A2023,S7A2024,S7A2025" -d Dim2=PT -d Dim3=T -d Dim4=T
 
-echo -e "\n# 10. Download data with a dimension filter"
-pyptine download 0004167 --output filtered_population_data.csv --dimension "Dim1=S7A2023"
+echo -e "
+# 10. The same as JSON, and as Excel (a Data and a Provenance sheet; needs openpyxl)"
+pyptine download 0004167 -f json --output population_portugal.json -d Dim1=S7A2025 -d Dim2=PT
+pyptine download 0004167 -f xlsx --output population_portugal.xlsx -d Dim1=S7A2025 -d Dim2=PT
 
 # --- Cache Management ---
 echo -e "\n# 11. View cache information"

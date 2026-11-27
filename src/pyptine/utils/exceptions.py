@@ -45,9 +45,8 @@ class INERefusalError(APIError):
         self.ine_code = ine_code
         self.ine_message = ine_message
         self.url = url
-        super().__init__(
-            200, f"INE refused the request for {varcd} (Cod {ine_code}): {ine_message}"
-        )
+        cod = f" (Cod {ine_code})" if ine_code else ""
+        super().__init__(200, f"INE refused the request for {varcd}{cod}: {ine_message}")
 
 
 class InvalidIndicatorError(INEError):

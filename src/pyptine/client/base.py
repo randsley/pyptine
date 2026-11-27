@@ -13,7 +13,7 @@ from requests.adapters import HTTPAdapter
 from pyptine.__version__ import __version__
 from pyptine.cache.disk import DiskCache
 from pyptine.client import retry
-from pyptine.client.parsing import check_success
+from pyptine.client.parsing import check_catalogue_body, check_success
 from pyptine.utils.exceptions import APIError, RateLimitError
 
 logger = logging.getLogger(__name__)
@@ -238,6 +238,9 @@ class INEClient:
             f"({'from cache' if from_cache else 'from API'}, status={response.status_code})"
         )
 
+        if response_format == "xml":
+            # INE's Java error page for a code not in the catalogue: refused, not retried.
+            check_catalogue_body(response.content, str(params.get("varcd", "")), response.url)
         try:
             if response_format == "json":
                 body: Union[dict[str, Any], str] = self._parse_json_response(response)

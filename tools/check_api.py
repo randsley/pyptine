@@ -398,6 +398,14 @@ def check_failures() -> None:
             check_fields(f"{where}: refusal (HTTP 200)", obj["Sucesso"]["Falso"][0], READ_FAIL)
         else:
             error(f"{where}: no Sucesso.Falso; INE used to refuse this with HTTP 200")
+    # The catalogue answers an unknown code with HTTP 200 and a Java stack trace (not XML),
+    # which pyptine.client.parsing.check_catalogue_body refuses.
+    where = "catalogue opc=1 9999999"
+    body = fetch(CATALOGUE, opc="1", varcd="9999999", lang="EN").content
+    if re.match(rb"^\s*<pre>\s*java\.[\w.$]+(Exception|Error)", body[:500]):
+        ok(f"{where}: Java error page (HTTP 200), as pyptine expects")
+    else:
+        error(f"{where}: no longer the Java error page; got {body[:80]!r}")
 
 
 # The catalogue's <extraction_date>, which CatalogueResponse needs (pyptine.provenance

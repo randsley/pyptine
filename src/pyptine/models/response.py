@@ -64,6 +64,11 @@ class DataResponse(BaseModel):
     dimensions: dict[str, str] = Field(
         default_factory=dict, description="Dimension filters sent (cat_id codes, comma-joined)"
     )
+    geo_classification: Optional[str] = Field(
+        default=None,
+        description="Classification of the geography (Dim2): 'nuts' or 'district', from the "
+        "codes of its metadata (see pyptine.geography.classify_geography)",
+    )
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -215,32 +220,44 @@ class DataResponse(BaseModel):
         """
         return self.model_dump(mode="python")
 
-    def with_geo_level(self) -> "DataResponse":
+    def with_geo_level(self, classification: Optional[str] = None) -> "DataResponse":
         """A copy whose rows carry ``geo_level``, read from their ``geocod``.
 
-        Values: ``country``, ``nuts1``, ``nuts2``, ``nuts3``, ``municipality``, ``parish``
-        for places; ``abroad``, ``unknown``, ``total`` for INE's pseudo-units. One request
-        returns every level at once, so filter on it (or use :meth:`at_level`) before
-        aggregating. See :mod:`pyptine.geography` for the rules.
+        Values: ``country``, ``nuts1``, ``nuts2``, ``nuts3``, ``district``, ``municipality``,
+        ``parish`` for places; ``abroad``, ``unknown``, ``total`` for INE's pseudo-units. One
+        request returns every level at once, so filter on it (or use :meth:`at_level`)
+        before aggregating. See :mod:`pyptine.geography` for the rules.
+
+        A two-digit code is a NUTS II region in a NUTS classification but a district in a
+        district one (``11`` is Norte, or Lisboa's district), so the classification is
+        needed: ``geo_classification``, set from the indicator's metadata when the data is
+        fetched, or ``classification`` ("nuts" or "district").
 
         Raises:
-            DataProcessingError: If a row has no ``geocod``, or a code INE is not known to
-                issue (all such codes are named)
+            DataProcessingError: If the classification is not known, a row has no
+                ``geocod``, or a code INE is not known to issue (all such codes are named)
         """
-        from pyptine.geography import check_codes, level_or_pseudo
+        from pyptine.geography import CLASSIFICATIONS, check_codes, level_or_pseudo
         from pyptine.utils.exceptions import DataProcessingError
 
+        scheme = classification or self.geo_classification
+        if scheme not in CLASSIFICATIONS:
+            raise DataProcessingError(
+                f"The geography classification of {self.varcd} is not known "
+                f"({scheme!r}); a two-digit code is a NUTS II region or a district depending "
+                f"on it. Pass classification= one of {CLASSIFICATIONS}"
+            )
         missing = sum(1 for r in self.data if "geocod" not in r)
         if missing:
             raise DataProcessingError(
                 f"{missing} row(s) of {self.varcd} have no geocod; cannot assign a level"
             )
         codes = [str(r["geocod"]) for r in self.data]
-        check_codes(codes)
-        rows = [{**r, "geo_level": level_or_pseudo(c)} for r, c in zip(self.data, codes)]
+        check_codes(codes, scheme)
+        rows = [{**r, "geo_level": level_or_pseudo(c, scheme)} for r, c in zip(self.data, codes)]
         return self.model_copy(update={"data": rows})
 
-    def at_level(self, *levels: str) -> "DataResponse":
+    def at_level(self, *levels: str, classification: Optional[str] = None) -> "DataResponse":
         """A copy with only the rows at the given levels, e.g. ``at_level("municipality")``.
 
         Levels are those of :meth:`with_geo_level` (places or pseudo-units).
@@ -256,7 +273,7 @@ class DataResponse(BaseModel):
         unknown = [lv for lv in levels if lv not in LEVELS + PSEUDO_UNITS]
         if unknown:
             raise ValueError(f"Unknown level(s) {unknown}; use {', '.join(LEVELS + PSEUDO_UNITS)}")
-        tagged = self.with_geo_level()
+        tagged = self.with_geo_level(classification)
         rows = [r for r in tagged.data if r["geo_level"] in levels]
         return self.model_copy(update={"data": rows})
 
@@ -433,7 +450,7 @@ class DataResponse(BaseModel):
 
         return plot_indicator(
             self._chronological(),
-            title=self.title,
+            title=kwargs.pop("title", self.title),
             x_column=x_column,
             y_column=y_column,
             chart_type=chart_type,
@@ -470,7 +487,7 @@ class DataResponse(BaseModel):
 
         return plot_line_chart(
             self._chronological(),
-            title=self.title,
+            title=kwargs.pop("title", self.title),
             x_column=x_column,
             y_column=y_column,
             color_column=color_column,
@@ -505,7 +522,7 @@ class DataResponse(BaseModel):
 
         return plot_bar_chart(
             self._chronological(),
-            title=self.title,
+            title=kwargs.pop("title", self.title),
             x_column=x_column,
             y_column=y_column,
             color_column=color_column,
@@ -539,7 +556,7 @@ class DataResponse(BaseModel):
 
         return plot_area_chart(
             self._chronological(),
-            title=self.title,
+            title=kwargs.pop("title", self.title),
             x_column=x_column,
             y_column=y_column,
             color_column=color_column,
@@ -575,7 +592,7 @@ class DataResponse(BaseModel):
 
         return plot_scatter_chart(
             self._chronological(),
-            title=self.title,
+            title=kwargs.pop("title", self.title),
             x_column=x_column,
             y_column=y_column,
             color_column=color_column,

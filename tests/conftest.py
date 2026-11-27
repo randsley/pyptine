@@ -8,6 +8,18 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def isolated_cache_dir(monkeypatch, tmp_path_factory):
+    """Point pyptine's default cache directory at a temporary one. Without this, code that
+    builds INE(cache=True) (the CLI does) reads and writes the user's real cache: the tests
+    then depend on what is cached, and leave hand-written responses where real use finds
+    them."""
+    import pyptine.cache.disk as disk
+
+    cache = tmp_path_factory.mktemp("pyptine-cache")
+    monkeypatch.setattr(disk, "user_cache_dir", lambda *args, **kwargs: str(cache))
+
+
+@pytest.fixture(autouse=True)
 def no_retry_waits(monkeypatch):
     """Retry without waiting (the real waits are 5, 20 and 60 s). Tests of the waits
     themselves pass retry_delays explicitly or patch time.sleep."""

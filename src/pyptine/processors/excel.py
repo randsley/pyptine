@@ -32,7 +32,7 @@ def _sheet_name(name: Any) -> str:
 
 def export_multiple_sheets(
     data_dict: Mapping[str, Union[pd.DataFrame, "DataResponse"]],
-    filepath: Path,
+    filepath: Union[str, Path],
     include_metadata: bool = True,
     metadata: Optional[dict[str, Any]] = None,
 ) -> None:

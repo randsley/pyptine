@@ -256,13 +256,16 @@ Things INE does that are worth knowing (verified 2026-11-27):
   ```python
   r = ine.get_data("0008273", {"Dim1": "S7A2022", "Dim3": "T", "Dim4": "T"})
   r.with_geo_level()            # rows gain geo_level: country, nuts1, nuts2, nuts3,
-                                # municipality, parish, or abroad / unknown / total
+                                # district, municipality, parish, or abroad / unknown / total
   r.at_level("municipality")    # the 308 municipalities only
   ```
 
   The level comes from the code (`geocod`), never the name: INE's English names are
-  inconsistent ("Continente" stays Portuguese; abroad is "Foreigner"). Codes INE is not
-  known to issue are refused. See `pyptine.geography` (`geo_level`, `pseudo_unit`).
+  inconsistent ("Continente" stays Portuguese; abroad is "Foreigner"). Some indicators
+  (0004167) use districts instead of NUTS, and there a two-digit code is a district (`11` is
+  Lisboa's district, not the NUTS II region Norte): the classification comes from the
+  indicator's metadata (`DataResponse.geo_classification`). Codes INE is not known to issue
+  are refused. See `pyptine.geography` (`geo_level`, `pseudo_unit`, `classify_geography`).
 - **An invalid code raises `DimensionError`** before any request, naming the code to use when you passed a label or INE's `categ_cod` (e.g. `H.1` for `H1`).
 - **INE's refusals raise `INERefusalError`** (INE answers them with HTTP 200), with INE's `ine_code` and `ine_message`. They are never cached.
 
