@@ -203,7 +203,7 @@ def info(varcd: str, lang: str) -> None:
     with spinner_task("Fetching indicator information...") as progress:
         task_id = progress.add_task("[cyan]Fetching...", total=None)
         indicator = ine.get_indicator(varcd)
-        metadata = ine.get_metadata(varcd)
+        metadata = ine.get_metadata(varcd, catalogue=False)  # catalogue fields: indicator
         progress.update(task_id, completed=True)
 
     # Display info in panel

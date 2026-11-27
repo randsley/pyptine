@@ -78,7 +78,7 @@ class TestINEIntegration:
         ine = INE(language="EN", cache=False)
 
         # Get metadata
-        metadata = ine.get_metadata("0004167")
+        metadata = ine.get_metadata("0004167", catalogue=False)
         assert metadata.varcd == "0004167"
         assert metadata.title
         assert len(metadata.dimensions) > 0

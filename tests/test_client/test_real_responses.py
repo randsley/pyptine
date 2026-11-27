@@ -567,6 +567,83 @@ class TestCatalogueKeywords:
         ]
 
 
+class TestMetadataFromCatalogue:
+    """pindicaMeta sends no description, theme, source, geographic level or URLs; the
+    catalogue's opc=1 record does, and INE.get_metadata fills them from it."""
+
+    def serve_catalogue(self, rsps, language):
+        base, params, body = recorded(f"catalogue_opc1_0008273_{language}.xml")
+        rsps.add(
+            responses.GET,
+            base,
+            body=body,
+            content_type="text/xml;charset=UTF-8",
+            match=[matchers.query_param_matcher(params)],
+        )
+
+    def test_metadata_endpoint_alone(self, rsps):
+        serve(rsps, "meta_0008273_EN.json")
+        m = MetadataClient(cache_enabled=False).get_metadata("0008273")
+        assert m.unit == "Number (No.)"
+        assert m.periodicity == "Annual"
+        for field in ("description", "theme", "subtheme", "source", "geo_last_level"):
+            assert getattr(m, field) is None, field
+        assert m.keywords == []
+        assert not hasattr(m, "notes")
+
+    def test_facade_fills_from_catalogue(self, rsps):
+        from pyptine import INE
+
+        serve(rsps, "meta_0008273_EN.json")
+        self.serve_catalogue(rsps, "EN")
+        m = INE(cache=False).get_metadata("0008273")
+        assert m.theme == "Population"
+        assert m.subtheme == "Population estimates"
+        assert m.source == "Statistics Portugal, Annual estimates of resident population"
+        assert m.geo_last_level == "Município"  # not localised under EN for this indicator
+        assert m.description.startswith("Resident population (No.) by Place of residence")
+        assert m.html_url == "https://www.ine.pt/xurl/indx/0008273"
+        assert m.keywords[0] == "INE"
+        # The metadata endpoint's own fields are kept.
+        assert m.title == "Resident population (No.)" or m.title.startswith("Resident population")
+        assert m.unit == "Number (No.)"
+        assert m.periodicity == "Annual"
+        assert m.last_period == "2023"
+        assert len(m.dimensions) == 4
+
+    def test_portuguese(self, rsps):
+        from pyptine import INE
+
+        serve(rsps, "meta_0008273_PT.json")
+        self.serve_catalogue(rsps, "PT")
+        m = INE(language="PT", cache=False).get_metadata("0008273")
+        assert m.theme == "População"
+        assert m.language == "PT"
+
+    def test_catalogue_false_makes_one_request(self, rsps):
+        from pyptine import INE
+
+        serve(rsps, "meta_0008273_EN.json")
+        m = INE(cache=False).get_metadata("0008273", catalogue=False)
+        assert m.theme is None
+        assert len(rsps.calls) == 1
+
+    def test_mismatched_records_refused(self):
+        from pyptine.client.metadata import with_catalogue
+        from pyptine.models.indicator import IndicatorMetadata
+        from pyptine.utils.exceptions import DataProcessingError
+
+        m = IndicatorMetadata(varcd="0008273", title="t", language="EN")
+        with pytest.raises(DataProcessingError, match="does not match"):
+            with_catalogue(m, Indicator(varcd="0012234", title="u"))
+
+    def test_catalogue_has_no_unit(self, rsps):
+        from pyptine.client.catalogue import CatalogueClient
+
+        self.serve_catalogue(rsps, "EN")
+        assert CatalogueClient(cache_enabled=False).get_indicator("0008273").unit is None
+
+
 class TestExcelProvenance:
     TWO = TestProvenance.TWO
 

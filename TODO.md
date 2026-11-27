@@ -16,18 +16,18 @@ ignores `start`/`count`). Ordered by effect on users.
 - Weekly API-drift check; offline tests pinned against recorded INE responses.
 - Retries (404 throttling, 429 with Retry-After, 5xx, resets, malformed bodies; 5/20/60 s) and a 130 s read timeout, sync and async.
 - Provenance in what is written: INE's `DataExtracao`, request URL, filters, periods, licence and citation in `DataResponse`, the CSV header and JSON; `cache_ttl` honoured. Excel export with a Provenance sheet; the catalogue's date is INE's.
+- Metadata's catalogue-only fields filled from `opc=1` by `INE.get_metadata`; `notes` removed.
 - Catalogue keywords parsed (split on CDATA boundaries); `opc=3`'s Portuguese titles documented.
 - Earlier: `get_data` always returns `DataResponse`; `search` takes `theme`; centralised CLI errors.
 
 ## Open
 
-1. **Metadata fields never sent.** `IndicatorMetadata.source`, `notes`, `description`, `theme`, `subtheme`, `geo_last_level` and the URLs are read from keys INE's metadata endpoint does not send, so they are always None. Fill them from the catalogue (`opc=1`) or drop them.
-2. **Geography.** Rows mix geographic levels (country, NUTS, municipalities). A `level` column from the `geocod` length would help; see PortugalINE.jl's "Geography traps" for the code forms (bare Census codes, NUTS III codes with letters, pseudo-units).
-3. **Examples** (`src/examples/`) use indicator `0004127`, which is not in INE's catalogue, and run the analysis methods on unfiltered data. Rewrite them against verified indicators.
-4. **Old-format parsing paths.** The parsers still accept a format INE does not serve (`dados`/`periodo`/`dimensoes`/`codigo`), and many older tests use hand-written fixtures in it. Move those tests to the recorded responses, then remove the old paths.
-5. **Package metadata.** `pyproject.toml` URLs point to `github.com/nigelrandsley/pyptine` (404; the repo is `randsley/pyptine`); the author email is not the public contact; 0.3.3 is tagged but not on PyPI.
-6. **CI.** Update actions (checkout v3, setup-python v4, codecov v3); Python 3.9 is past end of life; consider a scheduled run with live tests (the `live` marker is declared but unused).
-7. **Smaller.**
+1. **Geography.** Rows mix geographic levels (country, NUTS, municipalities). A `level` column from the `geocod` length would help; see PortugalINE.jl's "Geography traps" for the code forms (bare Census codes, NUTS III codes with letters, pseudo-units).
+2. **Examples** (`src/examples/`) use indicator `0004127`, which is not in INE's catalogue, and run the analysis methods on unfiltered data. Rewrite them against verified indicators.
+3. **Old-format parsing paths.** The parsers still accept a format INE does not serve (`dados`/`periodo`/`dimensoes`/`codigo`), and many older tests use hand-written fixtures in it. Move those tests to the recorded responses, then remove the old paths.
+4. **Package metadata.** `pyproject.toml` URLs point to `github.com/nigelrandsley/pyptine` (404; the repo is `randsley/pyptine`); the author email is not the public contact; 0.3.3 is tagged but not on PyPI.
+5. **CI.** Update actions (checkout v3, setup-python v4, codecov v3); Python 3.9 is past end of life; consider a scheduled run with live tests (the `live` marker is declared but unused).
+6. **Smaller.**
     - The CLI's `search --timeout` defaults to 10 s (the catalogue download takes ~20 s; the timeout is per read, so it works, but the help text says "Request timeout").
     - The catalogue's `<extraction_date>` has no timezone. On 2026-11-27 it matched the data endpoint's UTC `DataExtracao`, but Lisbon is UTC+0 then: compare again in summer (after 2027-03-28) to learn whether it is UTC or Lisbon time.
     - `INE` builds four clients, each opening its own `DiskCache`; share one.

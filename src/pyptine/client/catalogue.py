@@ -353,7 +353,6 @@ class CatalogueClient(INEClient):
                         logger.debug(f"Could not parse date: {last_update_str}")
 
             description = self._get_element_text(indicator_elem, "description")
-            unit = self._get_element_text(indicator_elem, "unit")
 
             # Create Indicator object
             indicator = Indicator(
@@ -369,8 +368,7 @@ class CatalogueClient(INEClient):
                 html_url=html_url or None,
                 metadata_url=metadata_url or None,
                 data_url=data_url or None,
-                source=source or None,  # Added source field
-                unit=unit or None,
+                source=source or None,
             )
 
             return indicator

@@ -8,6 +8,7 @@ from pyptine.client.base import INEClient
 from pyptine.models.indicator import (
     Dimension,
     DimensionValue,
+    Indicator,
     IndicatorMetadata,
 )
 from pyptine.utils.exceptions import DataProcessingError
@@ -158,17 +159,11 @@ class MetadataClient(INEClient):
                 )
                 language = response.get("Lingua") or response.get("lang", self.language)
                 unit = response.get("UnidadeMedida") or response.get("unidade")
-                source = response.get("Fonte") or response.get("fonte")
-                notes = response.get("Nota") or response.get("notas")
-                description = response.get("Descricao") or response.get("descricao")
-                theme = response.get("Tema") or response.get("tema")
-                subtheme = response.get("Subtema") or response.get("subtema")
+                # pindicaMeta sends no source, notes, description, theme, subtheme,
+                # geographic level or URLs (checked 2026-11-27; the drift check watches
+                # UNSENT_META). Those come from the catalogue: see with_catalogue.
                 periodicity = response.get("Periodic") or response.get("periodicidade")
                 last_period = response.get("UltimoPeriodo") or response.get("ultimoPeriodo")
-                geo_last_level = response.get("GeoUltimoNivel") or response.get("geoUltimoNivel")
-                html_url = response.get("UrlHtml") or response.get("urlHtml")
-                metadata_url = response.get("UrlMeta") or response.get("urlMeta")
-                data_url = response.get("UrlDados") or response.get("urlDados")
 
                 last_update_str = response.get("DataUltimaAtualizacao") or response.get(
                     "ultimaActualizacao"
@@ -203,18 +198,9 @@ class MetadataClient(INEClient):
                     language=language,
                     dimensions=dimensions,
                     unit=unit,
-                    source=source,
-                    notes=notes,
-                    description=description,
-                    theme=theme,
-                    subtheme=subtheme,
                     periodicity=periodicity,
                     last_period=last_period,
                     last_update=last_update,
-                    geo_last_level=geo_last_level,
-                    html_url=html_url,
-                    metadata_url=metadata_url,
-                    data_url=data_url,
                 )
             else:
                 # This case should ideally not be reached after the list check
@@ -343,3 +329,32 @@ class MetadataClient(INEClient):
         dimensions.sort(key=lambda d: d.id)
 
         return dimensions
+
+
+#: Fields of IndicatorMetadata that only INE's catalogue (opc=1) sends.
+CATALOGUE_FIELDS = (
+    "description",
+    "theme",
+    "subtheme",
+    "keywords",
+    "source",
+    "geo_last_level",
+    "html_url",
+    "metadata_url",
+    "data_url",
+)
+
+
+def with_catalogue(metadata: IndicatorMetadata, indicator: Indicator) -> IndicatorMetadata:
+    """Metadata with the fields only the catalogue sends filled from its ``opc=1`` record.
+
+    Title, unit, periodicity, last period and last update stay the metadata endpoint's.
+
+    Raises:
+        DataProcessingError: If the two records are for different indicators
+    """
+    if indicator.varcd != metadata.varcd:
+        raise DataProcessingError(
+            f"Catalogue record {indicator.varcd} does not match metadata {metadata.varcd}"
+        )
+    return metadata.model_copy(update={f: getattr(indicator, f) for f in CATALOGUE_FIELDS})

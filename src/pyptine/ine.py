@@ -8,7 +8,7 @@ from typing import Any, Literal, Optional, Union
 from pyptine.client.base import INEClient
 from pyptine.client.catalogue import CatalogueClient
 from pyptine.client.data import DataClient
-from pyptine.client.metadata import MetadataClient
+from pyptine.client.metadata import MetadataClient, with_catalogue
 from pyptine.client.parsing import DimensionFilters
 from pyptine.models.indicator import Dimension, Indicator, IndicatorMetadata
 from pyptine.models.response import DataResponse
@@ -222,13 +222,17 @@ class INE:
             varcd, dimensions=dimensions, periods_per_request=periods_per_request
         )
 
-    def get_metadata(self, varcd: str) -> IndicatorMetadata:
+    def get_metadata(self, varcd: str, catalogue: bool = True) -> IndicatorMetadata:
         """Get indicator metadata.
 
-        Retrieves complete metadata including dimensions, units, and descriptions.
+        Dimensions, unit, periodicity and dates come from INE's metadata endpoint. It sends
+        no description, theme, subtheme, keywords, source, geographic level or URLs; with
+        ``catalogue`` (the default) those are filled from the catalogue's record for the
+        indicator (``opc=1``, one more request, cached 7 days).
 
         Args:
             varcd: Indicator code
+            catalogue: Fill the catalogue-only fields (False: leave them None)
 
         Returns:
             Indicator metadata
@@ -240,7 +244,10 @@ class INE:
             >>> print(f"Dimensions: {len(metadata.dimensions)}")
         """
         logger.info(f"Fetching metadata for indicator {varcd}")
-        return self.metadata_client.get_metadata(varcd)
+        metadata = self.metadata_client.get_metadata(varcd)
+        if not catalogue:
+            return metadata
+        return with_catalogue(metadata, self.catalogue_client.get_indicator(varcd))
 
     def get_dimensions(self, varcd: str) -> list[Dimension]:
         """Get available dimensions for an indicator.

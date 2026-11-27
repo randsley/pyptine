@@ -191,13 +191,14 @@ results = ine.search("employment", theme="Labour market")
 Retrieve detailed information about an indicator, including its dimensions.
 
 ```python
-metadata = ine.get_metadata("0004167")
+metadata = ine.get_metadata("0008273")
 print(f"Title: {metadata.title}")
 print(f"Unit: {metadata.unit}")
+print(f"Theme: {metadata.theme}")
 print(f"Source: {metadata.source}")
 
 # List available dimensions
-dimensions = ine.get_dimensions("0004167")
+dimensions = ine.get_dimensions("0008273")
 for dim in dimensions:
     print(f"\nDimension: {dim.name}")
     for value in dim.values[:5]:  # Show first 5 values
@@ -419,7 +420,7 @@ The main class for interacting with the INE API.
 | `search(query, ...)` | Search for indicators. |
 | `get_data(varcd, ...)` | Get data for an indicator as a `DataResponse` object (the latest period unless `Dim1` is given). |
 | `get_all_data(varcd, ...)` | Get every period of an indicator, one `DataResponse` per batch of periods. |
-| `get_metadata(varcd)` | Get detailed metadata for an indicator. |
+| `get_metadata(varcd, catalogue=True)` | Metadata for an indicator: dimensions, unit, periodicity and dates from INE's metadata endpoint; description, theme, subtheme, keywords, source, geographic level and URLs from the catalogue (one more request, cached; `catalogue=False` leaves them None). |
 | `get_dimensions(varcd)` | Get available dimensions for an indicator. |
 | `get_indicator(varcd)` | Get catalogue information for a single indicator. |
 | `validate_indicator(varcd)` | Check if an indicator code is valid. |
