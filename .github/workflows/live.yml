@@ -1,0 +1,28 @@
+name: Live tests
+
+# Weekly: do users' paths still work end to end on today's INE? See tests/live/.
+# Kept apart from push CI, so a network failure never turns it red. A failed scheduled run
+# emails the repo owner. 07:30 UTC Monday: after PortugalINE.jl's checks (06:00, 06:30) and
+# pyptine's API check (07:00), because INE answers bursts with 404.
+on:
+  schedule:
+    - cron: "30 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Run the live tests
+        run: pytest tests/live -m live --no-cov

@@ -19,7 +19,7 @@ High-level Python client for Statistics Portugal (INE) API. Query and download s
 - 🖥️ **Enhanced CLI**: Rich formatting with progress bars, tables, and colored output.
 - 📅 **Every Period**: `get_all_data()` fetches all of an indicator's periods, a batch per request.
 - 📖 **Modern Python**: Fully type-annotated for better developer experience and IDE support.
-- ✅ **Tested against real INE responses**: offline tests on recorded responses, plus a weekly check against the live API.
+- ✅ **Tested against real INE responses**: offline tests on recorded responses, plus weekly live tests and a check of the fields INE sends.
 - 🛑 **Refuses rather than guesses**: INE's refusals and invalid dimension codes raise errors that name the cause.
 
 ## Installation
@@ -473,11 +473,11 @@ pip install -e ".[dev]"
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run the offline tests (recorded INE responses; no network)
 pytest
 
-# Run tests with coverage report
-pytest --cov=src/pyptine --cov-report=term-missing
+# Run the live tests against INE's API (deselected by default; ~30 s)
+pytest -m live tests/live --no-cov
 ```
 
 ### Code Quality

@@ -19,6 +19,7 @@ ignores `start`/`count`). Ordered by effect on users.
 - Examples rewritten against verified indicators; each runs end to end.
 - Old-format parsing removed; every test runs on recorded INE responses.
 - Python 3.10 is the minimum (3.9 is past end of life).
+- Live tests (`tests/live/`, `pytest -m live`), weekly in CI.
 - CI: current actions, `tools/` linted, a `package` job (build, `twine check`, wheel contents); the Codecov upload, which never had a token, removed.
 - Package metadata: repository URLs, public contact email, one version source (0.4.0.dev0), CITATION.cff; the wheel no longer installs a top-level `examples`.
 - District geographies (0004167) told from NUTS; the catalogue's Java error page for unknown codes refused at once.
@@ -29,8 +30,7 @@ ignores `start`/`count`). Ordered by effect on users.
 
 ## Open
 
-1. **CI.** Consider a scheduled run with live tests (the `live` marker is declared but unused).
-2. **Smaller.**
+1. **Smaller.**
     - The CLI's `search --timeout` defaults to 10 s (the catalogue download takes ~20 s; the timeout is per read, so it works, but the help text says "Request timeout").
     - The catalogue's `<extraction_date>` has no timezone. On 2026-11-27 it matched the data endpoint's UTC `DataExtracao`, but Lisbon is UTC+0 then: compare again in summer (after 2027-03-28) to learn whether it is UTC or Lisbon time.
     - `ine_citation` lists every period; a long contiguous run (27 quarters) could be written as a range.

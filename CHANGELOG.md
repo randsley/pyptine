@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Live tests (`tests/live/`, run with `pytest -m live`): the users' paths end to end on INE's API (periods, provenance, every geographic level, districts, quarterly series, refusals, catalogue and search, CSV provenance, async against sync). They assert codes and structure, not figures. Weekly in CI (`live.yml`); deselected otherwise.
+
 ## [0.4.0] - 2026-11-27
 
 Fixes found by an audit against the live INE API (2026-11-27). Several change behaviour.

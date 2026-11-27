@@ -20,9 +20,12 @@ def isolated_cache_dir(monkeypatch, tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
-def no_retry_waits(monkeypatch):
+def no_retry_waits(request, monkeypatch):
     """Retry without waiting (the real waits are 5, 20 and 60 s). Tests of the waits
-    themselves pass retry_delays explicitly or patch time.sleep."""
+    themselves pass retry_delays explicitly or patch time.sleep. Live tests keep the real
+    waits: INE answers bursts with 404, and only waiting gets past it."""
+    if request.node.get_closest_marker("live"):
+        return
     from pyptine.client.async_base import AsyncINEClient
     from pyptine.client.base import INEClient
 

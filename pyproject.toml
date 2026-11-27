@@ -73,9 +73,10 @@ include = ["pyptine*"]  # not src/examples: it would install a top-level "exampl
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --cov=pyptine --cov-report=term-missing"
+# Live tests (tests/live/, against INE) are deselected; run them with `pytest -m live`.
+addopts = "-v --cov=pyptine --cov-report=term-missing -m 'not live'"
 markers = [
-    "live: marks tests that hit the live API (deselect with '-m \"not live\"')",
+    "live: tests against the live INE API (tests/live/); deselected unless `-m live`",
     "asyncio: marks tests as async",
 ]
 asyncio_mode = "auto"
