@@ -251,7 +251,18 @@ df_filtered = filtered_response.to_dataframe()
 Things INE does that are worth knowing (verified 2026-11-27):
 
 - **Without `Dim1`, INE returns only the latest period.** Ask for periods explicitly, or use `get_all_data()`.
-- **One request returns every geographic level at once** (country, NUTS I/II/III and municipalities for many indicators). Filter `Dim2`, or the rows by `geocod`, before adding values up.
+- **One request returns every geographic level at once** (country, NUTS I/II/III, municipalities and parishes for many indicators), and some indicators add rows that are not places (residence abroad, unknown, the grand total). Filter `Dim2`, or the rows by level, before adding values up:
+
+  ```python
+  r = ine.get_data("0008273", {"Dim1": "S7A2022", "Dim3": "T", "Dim4": "T"})
+  r.with_geo_level()            # rows gain geo_level: country, nuts1, nuts2, nuts3,
+                                # municipality, parish, or abroad / unknown / total
+  r.at_level("municipality")    # the 308 municipalities only
+  ```
+
+  The level comes from the code (`geocod`), never the name: INE's English names are
+  inconsistent ("Continente" stays Portuguese; abroad is "Foreigner"). Codes INE is not
+  known to issue are refused. See `pyptine.geography` (`geo_level`, `pseudo_unit`).
 - **An invalid code raises `DimensionError`** before any request, naming the code to use when you passed a label or INE's `categ_cod` (e.g. `H.1` for `H1`).
 - **INE's refusals raise `INERefusalError`** (INE answers them with HTTP 200), with INE's `ine_code` and `ine_message`. They are never cached.
 

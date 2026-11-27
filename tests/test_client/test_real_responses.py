@@ -644,6 +644,113 @@ class TestMetadataFromCatalogue:
         assert CatalogueClient(cache_enabled=False).get_indicator("0008273").unit is None
 
 
+class TestGeography:
+    """Levels from codes, pinned on INE's real codes (live births 0008234 carries every level
+    and the pseudo-units; 0008273 one period at every level)."""
+
+    @staticmethod
+    def births_rows():
+        doc = json.loads((FIXTURES / "data_0008234_S7A2023_geo_EN.json").read_bytes())[0]
+        return doc["Dados"]["2023"]
+
+    def test_births_codes(self):
+        from pyptine.geography import level_or_pseudo
+
+        got = {r["geocod"]: level_or_pseudo(r["geocod"]) for r in self.births_rows()}
+        assert got == {
+            "T": "total",
+            "PT": "country",
+            "1": "nuts1",
+            "11": "nuts2",
+            "11A": "nuts3",  # NUTS III with a letter
+            "11A0104": "municipality",  # Arouca
+            "2004301": "municipality",  # Angra do Heroismo (Azores)
+            "11A010402": "parish",
+            "1120302FA": "parish",  # a Barcelos union: letters in the DICOFRE
+            "YY": "abroad",
+            "0": "abroad",
+            "00": "abroad",
+            "000": "abroad",
+            "0000000": "abroad",
+            "000000000": "abroad",
+            "9": "unknown",
+            "99": "unknown",
+            "999": "unknown",
+            "9999999": "unknown",
+            "999999999": "unknown",
+        }
+
+    def test_names_not_used(self):
+        # Under lang=EN INE labels abroad "Foreigner" and leaves the mainland "Continente":
+        # the level comes from codes alone.
+        names = {r["geocod"]: r["geodsg"] for r in self.births_rows()}
+        assert names["0"] == "Foreigner"
+        assert names["1"] == "Continente"
+
+    def test_pseudo_unit_is_not_a_place(self):
+        from pyptine.geography import geo_level
+        from pyptine.utils.exceptions import DataProcessingError
+
+        for code in ("T", "YY", "000", "9999999"):
+            with pytest.raises(DataProcessingError, match="not a place"):
+                geo_level(code)
+
+    @pytest.mark.parametrize("code", ["", "12345", "12345678", "1234567890", "AB12", "0302F!"])
+    def test_unknown_shape_refused(self, code):
+        from pyptine.geography import level_or_pseudo
+        from pyptine.utils.exceptions import DataProcessingError
+
+        with pytest.raises(DataProcessingError, match="INE issues"):
+            level_or_pseudo(code)
+
+    def test_bare_census_codes(self):
+        from pyptine.geography import geo_level, pseudo_unit
+
+        assert geo_level("0104") == "municipality"
+        assert geo_level("010402") == "parish"
+        assert geo_level("0302FA") == "parish"
+        assert pseudo_unit("9901") == "unknown"  # districts 99 and 00 do not exist
+        assert pseudo_unit("0001") == "abroad"
+        assert pseudo_unit("1119901") == "unknown"
+
+    def test_population_levels(self, rsps):
+        serve(rsps, "meta_0008273_EN.json", "data_0008273_S7A2022_levels_EN.json")
+        r = client().get_data("0008273", {"Dim1": "S7A2022", "Dim3": "T", "Dim4": "T"})
+        tagged = r.with_geo_level()
+        from collections import Counter
+
+        assert Counter(row["geo_level"] for row in tagged.data) == {
+            "country": 1,
+            "nuts1": 3,
+            "nuts2": 7,
+            "nuts3": 25,
+            "municipality": 308,
+        }
+        assert "geo_level" not in r.data[0]  # the original is unchanged
+        assert tagged.url == r.url  # provenance kept
+
+        munis = r.at_level("municipality")
+        assert len(munis.data) == 308
+        assert sum(row["value"] for row in munis.data) == r.at_level("country").data[0]["value"]
+        assert len(r.at_level("nuts1", "nuts2").data) == 10
+
+    def test_at_level_arguments(self, rsps):
+        serve(rsps, "meta_0008273_EN.json", "data_0008273_latest_EN.json")
+        r = client().get_data("0008273", TOTAL)
+        with pytest.raises(ValueError, match="at least one"):
+            r.at_level()
+        with pytest.raises(ValueError, match="Unknown level"):
+            r.at_level("district")
+
+    def test_row_without_geocod_refused(self):
+        from pyptine.models.response import DataResponse
+        from pyptine.utils.exceptions import DataProcessingError
+
+        r = DataResponse(varcd="0008273", title="t", language="EN", data=[{"value": 1.0}])
+        with pytest.raises(DataProcessingError, match="no geocod"):
+            r.with_geo_level()
+
+
 class TestExcelProvenance:
     TWO = TestProvenance.TWO
 

@@ -215,6 +215,51 @@ class DataResponse(BaseModel):
         """
         return self.model_dump(mode="python")
 
+    def with_geo_level(self) -> "DataResponse":
+        """A copy whose rows carry ``geo_level``, read from their ``geocod``.
+
+        Values: ``country``, ``nuts1``, ``nuts2``, ``nuts3``, ``municipality``, ``parish``
+        for places; ``abroad``, ``unknown``, ``total`` for INE's pseudo-units. One request
+        returns every level at once, so filter on it (or use :meth:`at_level`) before
+        aggregating. See :mod:`pyptine.geography` for the rules.
+
+        Raises:
+            DataProcessingError: If a row has no ``geocod``, or a code INE is not known to
+                issue (all such codes are named)
+        """
+        from pyptine.geography import check_codes, level_or_pseudo
+        from pyptine.utils.exceptions import DataProcessingError
+
+        missing = sum(1 for r in self.data if "geocod" not in r)
+        if missing:
+            raise DataProcessingError(
+                f"{missing} row(s) of {self.varcd} have no geocod; cannot assign a level"
+            )
+        codes = [str(r["geocod"]) for r in self.data]
+        check_codes(codes)
+        rows = [{**r, "geo_level": level_or_pseudo(c)} for r, c in zip(self.data, codes)]
+        return self.model_copy(update={"data": rows})
+
+    def at_level(self, *levels: str) -> "DataResponse":
+        """A copy with only the rows at the given levels, e.g. ``at_level("municipality")``.
+
+        Levels are those of :meth:`with_geo_level` (places or pseudo-units).
+
+        Raises:
+            ValueError: If no level, or an unknown level, is given
+            DataProcessingError: As :meth:`with_geo_level`
+        """
+        from pyptine.geography import LEVELS, PSEUDO_UNITS
+
+        if not levels:
+            raise ValueError("at_level needs at least one level")
+        unknown = [lv for lv in levels if lv not in LEVELS + PSEUDO_UNITS]
+        if unknown:
+            raise ValueError(f"Unknown level(s) {unknown}; use {', '.join(LEVELS + PSEUDO_UNITS)}")
+        tagged = self.with_geo_level()
+        rows = [r for r in tagged.data if r["geo_level"] in levels]
+        return self.model_copy(update={"data": rows})
+
     def calculate_yoy_growth(
         self,
         value_column: str = "value",

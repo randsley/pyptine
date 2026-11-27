@@ -1,0 +1,156 @@
+[ {
+  "IndicadorCod" : "0008234",
+  "IndicadorDsg" : "Live births (No.) by Place of residence of mother (NUTS - 2013) and Sex; Annual - Statistics Portugal, Live-birth statistics",
+  "MetaInfUrl" : "https://www.ine.pt/bddXplorer/htdocs/minfo.jsp?var_cd=0008234&lingua=EN",
+  "DataExtracao" : "2026-11-27T18:36:51.029Z",
+  "DataUltimoAtualizacao" : "2024-04-30",
+  "UltimoPref" : "2023",
+  "Dados" : {
+    "2023" : [ {
+      "geocod" : "1120302FA",
+      "geodsg" : "União das freguesias de Milhazes, Vilar de Figos e Faria",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "11",
+      "valor" : "11"
+    }, {
+      "geocod" : "9",
+      "geodsg" : "Unknown",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "0",
+      "valor" : "0"
+    }, {
+      "geocod" : "99",
+      "geodsg" : "Unknown",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "0",
+      "valor" : "0"
+    }, {
+      "geocod" : "999",
+      "geodsg" : "Unknown",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "0",
+      "valor" : "0"
+    }, {
+      "geocod" : "9999999",
+      "geodsg" : "Unknown",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "0",
+      "valor" : "0"
+    }, {
+      "geocod" : "999999999",
+      "geodsg" : "Unknown",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "0",
+      "valor" : "0"
+    }, {
+      "geocod" : "PT",
+      "geodsg" : "Portugal",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "85 699",
+      "valor" : "85699"
+    }, {
+      "geocod" : "T",
+      "geodsg" : "Total",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "85 994",
+      "valor" : "85994"
+    }, {
+      "geocod" : "YY",
+      "geodsg" : "Foreigner",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "295",
+      "valor" : "295"
+    }, {
+      "geocod" : "2004301",
+      "geodsg" : "Angra do Heroísmo",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "253",
+      "valor" : "253"
+    }, {
+      "geocod" : "0",
+      "geodsg" : "Foreigner",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "295",
+      "valor" : "295"
+    }, {
+      "geocod" : "00",
+      "geodsg" : "Foreigner",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "295",
+      "valor" : "295"
+    }, {
+      "geocod" : "000",
+      "geodsg" : "Foreigner",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "295",
+      "valor" : "295"
+    }, {
+      "geocod" : "0000000",
+      "geodsg" : "Foreigner",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "295",
+      "valor" : "295"
+    }, {
+      "geocod" : "000000000",
+      "geodsg" : "Foreigner",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "295",
+      "valor" : "295"
+    }, {
+      "geocod" : "1",
+      "geodsg" : "Continente",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "81 910",
+      "valor" : "81910"
+    }, {
+      "geocod" : "11",
+      "geodsg" : "Norte",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "26 173",
+      "valor" : "26173"
+    }, {
+      "geocod" : "11A",
+      "geodsg" : "Área Metropolitana do Porto",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "13 176",
+      "valor" : "13176"
+    }, {
+      "geocod" : "11A0104",
+      "geodsg" : "Arouca",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "138",
+      "valor" : "138"
+    }, {
+      "geocod" : "11A010402",
+      "geodsg" : "Alvarenga",
+      "dim_3" : "T",
+      "dim_3_t" : "MF",
+      "ind_string" : "8",
+      "valor" : "8"
+    } ]
+  },
+  "Sucesso" : {
+    "Verdadeiro" : [ {
+      "Msg" : "OK"
+    } ]
+  }
+} ]

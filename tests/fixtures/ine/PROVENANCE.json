@@ -106,6 +106,13 @@
       "captured": "2026-11-27T16:18:00+00:00",
       "sha256": "5d5025ee71078ac6c57eb0d98e1259cbae94f340f3c47b9f8726fdeb09ccbcb6",
       "bytes": 1668
+    },
+    "data_0008234_S7A2023_geo_EN.json": {
+      "url": "https://www.ine.pt/ine/json_indicador/pindica.jsp?op=2&varcd=0008234&lang=EN&Dim1=S7A2023&Dim2=T%2CPT%2C1%2C11%2C11A%2C11A0104%2C11A010402%2C1120302FA%2C2004301%2CYY%2C0%2C00%2C000%2C0000000%2C000000000%2C9%2C99%2C999%2C9999999%2C999999999&Dim3=T",
+      "purpose": "live births: every geographic level and INE's pseudo-units (total, abroad, unknown)",
+      "captured": "2026-11-27T18:36:52+00:00",
+      "sha256": "5841dcf9795eb19cc85b0419135d65ee933d92b2d10bda6839fccaeac0ca217c",
+      "bytes": 3736
     }
   }
 }

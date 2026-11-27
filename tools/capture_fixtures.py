@@ -9,12 +9,17 @@ changes the files: review the diff, and update the pinned facts that moved.
 
 Responses are filtered to stay small. The indicators: 0008273 resident population by place of
 residence, sex and age group (annual; Dim2 geography, Dim3 sex, Dim4 age group); 0012234 median
-value of dwelling sales (quarterly; Dim3 cat_id H1 versus categ_cod H.1).
+value of dwelling sales (quarterly; Dim3 cat_id H1 versus categ_cod H.1); 0008234 live births by
+mother's residence (annual; every geographic level and the pseudo-units).
+
+Capture some only, keeping the others and their PROVENANCE entries:
+    python tools/capture_fixtures.py --only data_0008234_S7A2023_geo_EN.json
 Source: Statistics Portugal (INE), https://www.ine.pt. Needs only requests.
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import pathlib
@@ -111,6 +116,19 @@ FIXTURES: dict[str, tuple[str, dict[str, str], str]] = {
         },
         "categ_cod refused",
     ),
+    "data_0008234_S7A2023_geo_EN.json": (
+        DATA,
+        {
+            "op": "2",
+            "varcd": "0008234",
+            "lang": "EN",
+            "Dim1": "S7A2023",
+            "Dim2": "T,PT,1,11,11A,11A0104,11A010402,1120302FA,2004301,"
+            "YY,0,00,000,0000000,000000000,9,99,999,9999999,999999999",
+            "Dim3": "T",
+        },
+        "live births: every geographic level and INE's pseudo-units (total, abroad, unknown)",
+    ),
     "catalogue_opc1_0008273_EN.xml": (
         CATALOGUE,
         {"opc": "1", "varcd": "0008273", "lang": "EN"},
@@ -126,13 +144,24 @@ FIXTURES: dict[str, tuple[str, dict[str, str], str]] = {
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+    parser.add_argument("--only", nargs="+", metavar="NAME", help="capture these fixtures only")
+    args = parser.parse_args()
+    unknown = sorted(set(args.only or []) - FIXTURES.keys())
+    if unknown:
+        parser.error(f"unknown fixture(s): {', '.join(unknown)}")
+
     OUT.mkdir(parents=True, exist_ok=True)
-    provenance = {
+    provenance: dict = {
         "source": "Statistics Portugal (INE), https://www.ine.pt",
         "captured_by": "tools/capture_fixtures.py",
         "files": {},
     }
-    for name, (url, params, purpose) in FIXTURES.items():
+    index = OUT / "PROVENANCE.json"
+    if args.only and index.exists():
+        provenance = json.loads(index.read_text(encoding="utf-8"))
+    for name in args.only or list(FIXTURES):
+        url, params, purpose = FIXTURES[name]
         time.sleep(1.0)  # INE answers bursts with 404
         r = requests.get(url, params=params, headers=UA, timeout=300)
         r.raise_for_status()
