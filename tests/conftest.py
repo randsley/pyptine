@@ -7,6 +7,17 @@ from typing import Any
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def no_retry_waits(monkeypatch):
+    """Retry without waiting (the real waits are 5, 20 and 60 s). Tests of the waits
+    themselves pass retry_delays explicitly or patch time.sleep."""
+    from pyptine.client.async_base import AsyncINEClient
+    from pyptine.client.base import INEClient
+
+    monkeypatch.setattr(INEClient, "RETRY_DELAYS", (0.0, 0.0, 0.0))
+    monkeypatch.setattr(AsyncINEClient, "RETRY_DELAYS", (0.0, 0.0, 0.0))
+
+
 @pytest.fixture
 def fixtures_dir() -> Path:
     """Return path to fixtures directory."""

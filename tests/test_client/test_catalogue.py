@@ -175,7 +175,8 @@ class TestCatalogueClient:
             status=200,
         )
 
-        with pytest.raises(DataProcessingError, match="Invalid XML"):
+        # A malformed body is retried, then reported as an API error.
+        with pytest.raises(APIError, match="Invalid XML"):
             catalogue_client.get_indicator("0004167")
 
     @responses.activate

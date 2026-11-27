@@ -35,7 +35,7 @@ class AsyncDataClient(AsyncINEClient):
     def __init__(
         self,
         language: str = "EN",
-        timeout: int = 30,
+        timeout: int = AsyncINEClient.DEFAULT_TIMEOUT,
         metadata_client: Optional[MetadataClient] = None,
     ):
         super().__init__(language, timeout)

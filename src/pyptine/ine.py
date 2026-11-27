@@ -32,7 +32,9 @@ class INE:
         cache: Enable HTTP caching
         cache_dir: Custom cache directory (default: platform-specific)
         cache_ttl: Cache time-to-live in seconds (default: 86400 / 1 day)
-        timeout: Request timeout in seconds (default: 30)
+        timeout: Read timeout in seconds (default: 130, longer than INE's 120 s gateway limit).
+            HTTP 404 (INE's throttling), 429 and 5xx, failed connections and malformed bodies
+            are retried after 5, 20 and 60 s; a read timeout is not
 
     Example:
         >>> from pyptine import INE
@@ -56,7 +58,7 @@ class INE:
         cache: bool = True,
         cache_dir: Optional[Path] = None,
         cache_ttl: Optional[int] = None,
-        timeout: int = 30,
+        timeout: int = INEClient.DEFAULT_TIMEOUT,
     ):
         """Initialize INE client.
 

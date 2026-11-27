@@ -104,7 +104,7 @@ class TestINEClient:
 
     @responses.activate
     def test_make_request_404_error(self):
-        """Test handling of 404 error."""
+        """A 404 that persists through the retries (INE answers 404 when throttling)."""
         client = INEClient()
 
         responses.add(
@@ -113,8 +113,9 @@ class TestINEClient:
             status=404,
         )
 
-        with pytest.raises(APIError, match="Resource not found"):
+        with pytest.raises(APIError, match="HTTP 404 after 4 attempt.*throttles"):
             client._make_request("/test")
+        assert len(responses.calls) == 4
 
     @responses.activate
     def test_make_request_500_error(self):

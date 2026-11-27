@@ -4,6 +4,7 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any, Optional
 
+from pyptine.client.async_base import AsyncINEClient
 from pyptine.client.async_data import AsyncDataClient
 from pyptine.client.metadata import MetadataClient
 from pyptine.client.parsing import DimensionFilters
@@ -21,7 +22,7 @@ class AsyncINE:
 
     Args:
         language: Language for API responses ("EN" or "PT", default: "EN")
-        timeout: Request timeout in seconds (default: 30)
+        timeout: Read timeout in seconds (default: 130; INE's gateway gives up after 120 s)
 
     Example:
         >>> async with AsyncINE(language="EN") as ine:
@@ -42,7 +43,7 @@ class AsyncINE:
     def __init__(
         self,
         language: str = "EN",
-        timeout: int = 30,
+        timeout: int = AsyncINEClient.DEFAULT_TIMEOUT,
     ) -> None:
         """Initialize async INE client."""
         self.language = language.upper()

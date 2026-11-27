@@ -37,7 +37,7 @@ class DataClient(INEClient):
     def __init__(
         self,
         language: str = "EN",
-        timeout: int = 30,
+        timeout: int = INEClient.DEFAULT_TIMEOUT,
         cache_enabled: bool = True,
         cache_dir: Optional[Path] = None,
         metadata_client: Optional[MetadataClient] = None,

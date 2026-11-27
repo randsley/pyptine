@@ -100,7 +100,7 @@ asyncio.run(main())
 - Non-blocking I/O for faster concurrent requests
 - Async iterator over batches of periods (`get_all_data`)
 - Same parsing, validation and errors as the synchronous `INE` client
-- Connection pooling (no retries yet, and no cache)
+- The same retries and timeouts as `INE` (no cache)
 
 ## Command-Line Usage
 
@@ -159,7 +159,18 @@ ine_no_cache = INE(cache=False)
 
 # Use a custom cache directory
 ine_custom_cache = INE(cache_dir=Path("/path/to/custom/cache"))
+
+# A different read timeout (default 130 s)
+ine_patient = INE(timeout=300)
 ```
+
+**Retries and timeouts.** INE answers HTTP 404 for valid codes when it throttles a burst of
+requests, resets connections and answers 429/5xx under load, and its gateway gives up with a
+504 after 120 s. pyptine retries those (and failed connections and malformed bodies) after 5,
+20 and 60 s, honouring a 429's `Retry-After` up to 120 s. The default read timeout (130 s) is
+longer than INE's gateway limit, so a slow request ends in a retried 504. Not retried: a read
+timeout (filter more dimensions or fewer periods, or raise `timeout`), other HTTP errors, and
+INE's refusals (`INERefusalError`). Each retry is logged as a warning.
 
 ### Working with Indicators
 

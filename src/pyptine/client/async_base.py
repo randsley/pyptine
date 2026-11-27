@@ -1,12 +1,16 @@
 """Async HTTP client for INE Portugal API."""
 
+import asyncio
 import logging
 import time
+from collections.abc import Sequence
 from typing import Any, Optional, Union
+from xml.etree import ElementTree as ET
 
 import httpx
 
 from pyptine.__version__ import __version__
+from pyptine.client import retry
 from pyptine.client.parsing import check_success
 from pyptine.utils.exceptions import APIError, RateLimitError
 
@@ -16,17 +20,15 @@ logger = logging.getLogger(__name__)
 class AsyncINEClient:
     """Async HTTP client for INE Portugal API.
 
-    Provides core async HTTP functionality with:
-    - Async session management with connection pooling
-    - Automatic retry logic with exponential backoff
-    - Timeout configuration
-    - User-agent identification
-    - Error handling and response validation
+    Same retry and timeout policy as the sync client (:mod:`pyptine.client.retry`): HTTP 404,
+    429 and 5xx, failed connections and malformed bodies are retried after 5, 20 and 60 s; a
+    read timeout and INE refusals are not. No cache.
 
     Args:
         language: Language for API responses ("EN" or "PT")
-        timeout: Request timeout in seconds
-        max_retries: Maximum number of retry attempts
+        timeout: Read timeout in seconds (default 130; INE's gateway answers 504 after 120 s)
+        max_retries: Retries after the first attempt (default 3)
+        retry_delays: Waits before each retry in seconds (default ``RETRY_DELAYS``)
 
     Example:
         >>> async with AsyncINEClient(language="EN") as client:
@@ -34,8 +36,9 @@ class AsyncINEClient:
     """
 
     BASE_URL = "https://www.ine.pt"
-    DEFAULT_TIMEOUT = 30
-    MAX_RETRIES = 3
+    DEFAULT_TIMEOUT = retry.DEFAULT_TIMEOUT
+    MAX_RETRIES = retry.MAX_RETRIES
+    RETRY_DELAYS = retry.RETRY_DELAYS
     USER_AGENT = f"pyptine/{__version__} (Python INE API Client - Async)"
 
     def __init__(
@@ -43,11 +46,13 @@ class AsyncINEClient:
         language: str = "EN",
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = MAX_RETRIES,
+        retry_delays: Optional[Sequence[float]] = None,
     ) -> None:
         """Initialize async INE client."""
         self.language = language.upper()
         self.timeout = timeout
         self.max_retries = max_retries
+        self.retry_delays = retry_delays
         self.client: Optional[httpx.AsyncClient] = None
 
         # Validate language
@@ -67,7 +72,7 @@ class AsyncINEClient:
                 "Accept": "application/json, text/xml",
                 "Accept-Encoding": "gzip, deflate",
             },
-            timeout=self.timeout,
+            timeout=httpx.Timeout(self.timeout, connect=retry.connect_timeout(self.timeout)),
         )
         return self
 
@@ -77,85 +82,97 @@ class AsyncINEClient:
             await self.client.aclose()
             logger.debug("Closed async HTTP client")
 
+    def _waits(self) -> list[float]:
+        delays = self.RETRY_DELAYS if self.retry_delays is None else self.retry_delays
+        return retry.waits(delays, self.max_retries)
+
     async def _make_request(
         self,
         endpoint: str,
         params: Optional[dict[str, Any]] = None,
         response_format: str = "json",
     ) -> Union[dict[str, Any], str]:
-        """Make async HTTP request to INE API.
-
-        Args:
-            endpoint: API endpoint path
-            params: Query parameters
-            response_format: Expected response format ("json" or "xml")
-
-        Returns:
-            Parsed JSON dict or raw XML string
+        """Make an async HTTP request to INE API, retrying INE's transient failures.
 
         Raises:
-            APIError: If request fails
-            RateLimitError: If rate limited
+            INERefusalError: If INE refused the request (not retried)
+            RateLimitError: If INE still answers 429 after the retries
+            APIError: If the request still fails after the retries, on a read timeout, or on
+                an HTTP error that is not retried
         """
         if not self.client:
             raise RuntimeError("Client not initialized. Use 'async with' context manager.")
+        if response_format not in ("json", "xml"):
+            raise ValueError(f"Unsupported response format: {response_format}")
 
         url = self.BASE_URL + endpoint
-
-        # Add language to params
         params = {} if params is None else params.copy()
         params["lang"] = self.language
-
         logger.debug(f"Making async request to {endpoint} with params: {params}")
 
+        waits = self._waits()
+        for attempt in range(len(waits) + 1):
+            try:
+                return await self._attempt(url, params, response_format, len(waits) + 1)
+            except retry.RetryableError as e:
+                if attempt == len(waits):
+                    raise e.error from None
+                wait = retry.wait_for(e.status, e.headers, waits[attempt])
+                logger.warning(
+                    f"INE request failed ({e}); retry {attempt + 1} of {len(waits)} in {wait:g} s"
+                )
+                await asyncio.sleep(wait)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    async def _attempt(
+        self, url: str, params: dict[str, Any], response_format: str, attempts: int
+    ) -> Union[dict[str, Any], str]:
+        """One request. Raises retry.RetryableError for a failure worth repeating."""
+        assert self.client is not None
+        start_time = time.time()
         try:
-            start_time = time.time()
             response = await self.client.get(url, params=params)
-            elapsed = time.time() - start_time
-
-            logger.debug(
-                f"Async request completed in {elapsed:.2f}s (status={response.status_code})"
-            )
-
-            # Handle rate limiting
-            if response.status_code == 429:
-                raise RateLimitError("Too many requests to INE API")
-
-            # Raise for HTTP errors
-            response.raise_for_status()
-
-            # Parse response based on format
-            if response_format == "json":
-                body = self._parse_json_response(response)
-                # INE refuses with HTTP 200 and Sucesso.Falso; raise instead of returning it.
-                check_success(body, str(params.get("varcd", "")), str(response.url))
-                return body
-            elif response_format == "xml":
-                return self._parse_xml_response(response)
-            else:
-                raise ValueError(f"Unsupported response format: {response_format}")
-
+        except httpx.ConnectTimeout as e:
+            raise retry.RetryableError(APIError(0, f"Network error: {e}")) from e
         except httpx.TimeoutException:
-            logger.error(f"Async request timeout after {self.timeout}s")
-            raise APIError(0, f"Request timeout after {self.timeout}s") from None
+            logger.error(f"Async read timeout after {self.timeout}s for {url}")
+            raise APIError(0, retry.read_timeout_message(self.timeout)) from None
+        except httpx.TransportError as e:
+            raise retry.RetryableError(APIError(0, f"Network error: {e}")) from e
+        logger.debug(
+            f"Async request completed in {time.time() - start_time:.2f}s "
+            f"(status={response.status_code})"
+        )
 
-        except httpx.HTTPError as e:
-            status_code = getattr(e.response, "status_code", 0) if hasattr(e, "response") else 0
-            logger.error(f"HTTP error: {status_code} - {str(e)}")
+        status = response.status_code
+        if status in retry.RETRY_STATUS:
+            text = retry.status_message(status, attempts)
+            error = (
+                RateLimitError(f"Too many requests to INE API: {text}")
+                if status == 429
+                else (APIError(status, text))
+            )
+            raise retry.RetryableError(error, status=status, headers=response.headers)
+        if status >= 400:
+            raise APIError(status, f"HTTP {status} for {response.url}")
 
-            if status_code == 404:
-                raise APIError(404, "Resource not found") from None
+        try:
+            if response_format == "json":
+                body: Union[dict[str, Any], str] = self._parse_json_response(response)
             else:
-                raise APIError(status_code, str(e)) from e
+                body = self._parse_xml_response(response)
+                ET.fromstring(body)
+        except (APIError, ET.ParseError) as e:
+            error = e if isinstance(e, APIError) else APIError(0, f"Invalid XML response: {e}")
+            raise retry.RetryableError(error) from e
+
+        # INE refuses with HTTP 200 and Sucesso.Falso; raise (not retried) instead of returning.
+        if response_format == "json":
+            check_success(body, str(params.get("varcd", "")), str(response.url))
+        return body
 
     def _parse_json_response(self, response: httpx.Response) -> dict[str, Any]:
         """Parse JSON response.
-
-        Args:
-            response: HTTP response
-
-        Returns:
-            Parsed JSON dictionary
 
         Raises:
             APIError: If JSON parsing fails
@@ -169,13 +186,7 @@ class AsyncINEClient:
             raise APIError(0, f"Invalid JSON response: {str(e)}") from e
 
     def _parse_xml_response(self, response: httpx.Response) -> str:
-        """Parse XML response.
-
-        Args:
-            response: HTTP response
-
-        Returns:
-            Raw XML string
+        """Return the XML text of a response.
 
         Raises:
             APIError: If response is not valid text

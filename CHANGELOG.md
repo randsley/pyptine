@@ -20,6 +20,9 @@ Fixes found by an audit against the live INE API (2026-11-27). Several change be
 - `DataClient` and `AsyncDataClient` create their own `MetadataClient` when none is given (period codes come from the metadata), and refuse one in another language.
 - The async client shares the sync client's parsing and validation (`pyptine.client.parsing`).
 
+- **Retries and timeouts** (`pyptine.client.retry`, sync and async alike): HTTP 404 (INE's answer when it throttles), 429 (honouring `Retry-After` up to 120 s) and 500/502/503/504, failed or reset connections, and malformed bodies are retried after 5, 20 and 60 s (`max_retries`, new `retry_delays`). A malformed body is dropped from the cache before the retry. A read timeout, other HTTP errors and INE refusals are not retried. The default read timeout is 130 s (was 30 s), longer than INE's 120 s gateway limit; the connect timeout is 10 s. urllib3's retry (5xx only, 1/2/4 s) is gone. The async client had no retry at all.
+- A 404 is reported as `HTTP 404 after N attempt(s)` with an explanation, no longer as "Resource not found". A body that stays malformed raises `APIError` (the catalogue used to raise `DataProcessingError` for invalid XML).
+
 ### Added
 
 - Weekly API-drift check (`tools/check_api.py`, `.github/workflows/api-check.yml`) and offline tests pinned against recorded INE responses (`tests/fixtures/ine/`, `tools/capture_fixtures.py`).

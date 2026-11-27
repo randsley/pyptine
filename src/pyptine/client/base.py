@@ -2,17 +2,19 @@
 
 import logging
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Optional, Union, cast
+from xml.etree import ElementTree as ET
 
 import requests
 from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 from pyptine.__version__ import __version__
 from pyptine.cache.disk import DiskCache
+from pyptine.client import retry
 from pyptine.client.parsing import check_success
-from pyptine.utils.exceptions import APIError, INERefusalError, RateLimitError
+from pyptine.utils.exceptions import APIError, RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -35,17 +37,19 @@ class INEClient:
 
     Provides core HTTP functionality including:
     - Session management with connection pooling
-    - Automatic retry logic with exponential backoff
-    - Timeout configuration
-    - User-agent identification
-    - Error handling and response validation
+    - Retries for INE's throttling and load (see :mod:`pyptine.client.retry`): HTTP 404, 429
+      and 5xx, failed connections and malformed bodies, after 5, 20 and 60 s
+    - A read timeout longer than INE's 120 s gateway limit
+    - INE refusals (HTTP 200 + ``Sucesso.Falso``) raised as ``INERefusalError``, never retried
 
     Args:
         language: Language for API responses ("EN" or "PT")
-        timeout: Request timeout in seconds
+        timeout: Read timeout in seconds (default 130; INE's gateway answers 504 after 120 s)
         cache_enabled: Enable HTTP caching
         cache_dir: Directory for cache storage
-        max_retries: Maximum number of retry attempts
+        max_retries: Retries after the first attempt (default 3)
+        retry_delays: Waits before each retry in seconds (default ``RETRY_DELAYS``; the last
+            value repeats if there are more retries)
 
     Example:
         >>> client = INEClient(language="EN")
@@ -53,8 +57,9 @@ class INEClient:
     """
 
     BASE_URL = "https://www.ine.pt"
-    DEFAULT_TIMEOUT = 30
-    MAX_RETRIES = 3
+    DEFAULT_TIMEOUT = retry.DEFAULT_TIMEOUT
+    MAX_RETRIES = retry.MAX_RETRIES
+    RETRY_DELAYS = retry.RETRY_DELAYS
     USER_AGENT = f"pyptine/{__version__} (Python INE API Client)"
 
     def __init__(
@@ -64,6 +69,7 @@ class INEClient:
         cache_enabled: bool = True,
         cache_dir: Optional[Path] = None,
         max_retries: int = MAX_RETRIES,
+        retry_delays: Optional[Sequence[float]] = None,
     ) -> None:
         """Initialize INE client."""
         self.language = language.upper()
@@ -71,6 +77,7 @@ class INEClient:
         self.cache_enabled = cache_enabled
         self.cache_dir = cache_dir
         self.max_retries = max_retries
+        self.retry_delays = retry_delays
         self.cache = None
 
         # Validate language
@@ -92,28 +99,11 @@ class INEClient:
         )
 
     def _create_session(self) -> requests.Session:
-        """Create HTTP session with retry configuration.
-
-        Returns:
-            Configured requests Session
-        """
+        """Create the HTTP session (retries are done by :meth:`_make_request`, not urllib3)."""
         session = requests.Session()
-
-        # Configure retry strategy
-        # Note: 429 is not in the list - we handle rate limiting explicitly
-        retry_strategy = Retry(
-            total=self.max_retries,
-            backoff_factor=1,  # Exponential backoff: {backoff factor} * (2 ** ({retry} - 1))
-            status_forcelist=[500, 502, 503, 504],
-            allowed_methods=["HEAD", "GET", "OPTIONS"],
-        )
-
-        # Mount adapter with retry strategy
-        adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=10, pool_maxsize=20)
+        adapter = HTTPAdapter(max_retries=0, pool_connections=10, pool_maxsize=20)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
-
-        # Set headers
         session.headers.update(
             {
                 "User-Agent": self.USER_AGENT,
@@ -121,8 +111,7 @@ class INEClient:
                 "Accept-Encoding": "gzip, deflate",
             }
         )
-
-        return cast(requests.Session, session)
+        return session
 
     def _get_session_for_endpoint(self, endpoint: str) -> requests.Session:
         """Get appropriate session for endpoint.
@@ -134,7 +123,7 @@ class INEClient:
             Cached or regular session based on endpoint and cache settings
         """
         if not self.cache_enabled or self.cache is None:
-            return cast(requests.Session, self.session)
+            return self.session
 
         # Use data cache for data endpoint
         if "pindica.jsp" in endpoint:
@@ -146,7 +135,11 @@ class INEClient:
 
         # Default to regular session for unknown endpoints
         else:
-            return cast(requests.Session, self.session)
+            return self.session
+
+    def _waits(self) -> list[float]:
+        delays = self.RETRY_DELAYS if self.retry_delays is None else self.retry_delays
+        return retry.waits(delays, self.max_retries)
 
     def _make_request(
         self,
@@ -155,7 +148,7 @@ class INEClient:
         response_format: str = "json",
         progress_callback: Optional[Any] = None,
     ) -> Union[dict[str, Any], str]:
-        """Make HTTP request to INE API.
+        """Make HTTP request to INE API, retrying INE's transient failures.
 
         Args:
             endpoint: API endpoint path (e.g., "/ine/json_indicador/pindica.jsp")
@@ -167,117 +160,119 @@ class INEClient:
             Parsed JSON dict or raw XML string
 
         Raises:
-            APIError: If request fails
-            RateLimitError: If rate limited
+            INERefusalError: If INE refused the request (not retried)
+            RateLimitError: If INE still answers 429 after the retries
+            APIError: If the request still fails after the retries, on a read timeout, or on
+                an HTTP error that is not retried
         """
-        url = self.BASE_URL + endpoint
+        if response_format not in ("json", "xml"):
+            raise ValueError(f"Unsupported response format: {response_format}")
 
-        # Add language to params
+        url = self.BASE_URL + endpoint
         params = {} if params is None else params.copy()
         params["lang"] = self.language
-
         logger.debug(f"Making request to {endpoint} with params: {params}")
-
-        # Select appropriate session (cached or regular)
         session = self._get_session_for_endpoint(endpoint)
 
+        waits = self._waits()
+        for attempt in range(len(waits) + 1):
+            try:
+                return self._attempt(session, url, params, response_format, progress_callback)
+            except retry.RetryableError as e:
+                if attempt == len(waits):
+                    raise e.error from None
+                wait = retry.wait_for(e.status, e.headers, waits[attempt])
+                logger.warning(
+                    f"INE request failed ({e}); retry {attempt + 1} of {len(waits)} in {wait:g} s"
+                )
+                time.sleep(wait)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    def _attempt(
+        self,
+        session: requests.Session,
+        url: str,
+        params: dict[str, Any],
+        response_format: str,
+        progress_callback: Optional[Any],
+    ) -> Union[dict[str, Any], str]:
+        """One request. Raises retry.RetryableError for a failure worth repeating."""
+        timeout = (retry.connect_timeout(self.timeout), self.timeout)
+        attempts = len(self._waits()) + 1
+        start_time = time.time()
         try:
-            start_time = time.time()
-
-            # Use streaming if progress callback is provided
-            # Note: Disable cache for streaming to get real-time progress
             if progress_callback is not None:
-                # Use raw session (not cached) for progress tracking
-                raw_session = self.session
-                response = raw_session.get(url, params=params, timeout=self.timeout, stream=True)
-
-                # Handle rate limiting
-                if response.status_code == 429:
-                    raise RateLimitError("Too many requests to INE API")
-
-                # Raise for HTTP errors
-                response.raise_for_status()
-
-                # Get total size from headers
+                # Stream through the uncached session to report progress.
+                response = self.session.get(url, params=params, timeout=timeout, stream=True)
+                self._check_status(response, attempts)
                 total_size = int(response.headers.get("content-length", 0))
                 downloaded = 0
                 chunks = []
-
-                # Report initial state
                 progress_callback(0, total_size)
-
-                # Download in chunks and report progress
-                chunk_size = 8192
-                for chunk in response.iter_content(chunk_size=chunk_size):
+                for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         chunks.append(chunk)
                         downloaded += len(chunk)
                         progress_callback(downloaded, total_size)
-
-                # Combine chunks
-                content = b"".join(chunks)
-                response._content = content
-
+                response._content = b"".join(chunks)
             else:
-                response = session.get(url, params=params, timeout=self.timeout)
-
-            elapsed = time.time() - start_time
-
-            # Check if response was from cache
-            from_cache = getattr(response, "from_cache", False)
-            cache_status = "from cache" if from_cache else "from API"
-            logger.debug(
-                f"Request completed in {elapsed:.2f}s ({cache_status}, "
-                f"status={response.status_code})"
-            )
-
-            # Handle rate limiting (for non-streaming requests)
-            if response.status_code == 429:
-                raise RateLimitError("Too many requests to INE API")
-
-            # Raise for HTTP errors (for non-streaming requests)
-            if not progress_callback:
-                response.raise_for_status()
-
-            # Parse response based on format
-            if response_format == "json":
-                body = self._parse_json_response(response)
-                # INE refuses with HTTP 200 and Sucesso.Falso; raise instead of returning it.
-                check_success(body, str(params.get("varcd", "")), response.url)
-                return body
-            elif response_format == "xml":
-                return self._parse_xml_response(response)
-            else:
-                raise ValueError(f"Unsupported response format: {response_format}")
-
-        except INERefusalError:
-            raise
-
+                response = session.get(url, params=params, timeout=timeout)
+                self._check_status(response, attempts)
+        except requests.ReadTimeout:
+            logger.error(f"Read timeout after {self.timeout}s for {url}")
+            raise APIError(0, retry.read_timeout_message(self.timeout)) from None
+        except (requests.ConnectionError, requests.exceptions.ChunkedEncodingError) as e:
+            raise retry.RetryableError(APIError(0, f"Network error: {e}")) from e
         except requests.Timeout:
-            logger.error(f"Request timeout after {self.timeout}s")
-            raise APIError(0, f"Request timeout after {self.timeout}s") from None
+            raise APIError(0, retry.read_timeout_message(self.timeout)) from None
 
-        except requests.HTTPError as e:
-            status_code = e.response.status_code if e.response is not None else 0
-            logger.error(f"HTTP error: {status_code} - {str(e)}")
+        from_cache = getattr(response, "from_cache", False)
+        logger.debug(
+            f"Request completed in {time.time() - start_time:.2f}s "
+            f"({'from cache' if from_cache else 'from API'}, status={response.status_code})"
+        )
 
-            if status_code == 404:
-                raise APIError(404, "Resource not found") from None
+        try:
+            if response_format == "json":
+                body: Union[dict[str, Any], str] = self._parse_json_response(response)
             else:
-                raise APIError(status_code, str(e)) from e
+                body = self._parse_xml_response(response)
+                ET.fromstring(body)  # a truncated catalogue must not be returned or cached
+        except (APIError, ET.ParseError) as e:
+            self._forget(session, response)
+            error = e if isinstance(e, APIError) else APIError(0, f"Invalid XML response: {e}")
+            raise retry.RetryableError(error) from e
 
-        except requests.RequestException as e:
-            logger.error(f"Request failed: {str(e)}")
-            raise APIError(0, f"Network error: {str(e)}") from e
+        # INE refuses with HTTP 200 and Sucesso.Falso; raise (not retried) instead of returning.
+        if response_format == "json":
+            check_success(body, str(params.get("varcd", "")), response.url)
+        return body
+
+    def _check_status(self, response: requests.Response, attempts: int) -> None:
+        status = response.status_code
+        if status in retry.RETRY_STATUS:
+            text = retry.status_message(status, attempts)
+            error = (
+                RateLimitError(f"Too many requests to INE API: {text}")
+                if status == 429
+                else (APIError(status, text))
+            )
+            raise retry.RetryableError(error, status=status, headers=response.headers)
+        if status >= 400:
+            raise APIError(status, f"HTTP {status} for {response.url}")
+
+    @staticmethod
+    def _forget(session: requests.Session, response: requests.Response) -> None:
+        """Drop a response from the cache (a malformed body must not be served again)."""
+        cache = getattr(session, "cache", None)
+        if cache is not None:
+            try:
+                cache.delete(requests=[response.request])
+            except Exception as e:  # the retry still happens; the stale entry would expire
+                logger.warning(f"Could not drop a malformed response from the cache: {e}")
 
     def _parse_json_response(self, response: requests.Response) -> dict[str, Any]:
         """Parse JSON response.
-
-        Args:
-            response: HTTP response
-
-        Returns:
-            Parsed JSON dictionary
 
         Raises:
             APIError: If JSON parsing fails
@@ -291,19 +286,13 @@ class INEClient:
             raise APIError(0, f"Invalid JSON response: {str(e)}") from e
 
     def _parse_xml_response(self, response: requests.Response) -> str:
-        """Parse XML response.
-
-        Args:
-            response: HTTP response
-
-        Returns:
-            Raw XML string
+        """Return the XML text of a response.
 
         Raises:
             APIError: If response is not valid text
         """
         try:
-            xml_text = cast(str, response.text)
+            xml_text = response.text
             logger.debug(f"Parsed XML response with {len(xml_text)} characters")
             return xml_text
         except Exception as e:
