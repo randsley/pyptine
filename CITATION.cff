@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: >-
+  If you use pyptine, please cite it as below. Data obtained with it come from
+  Statistics Portugal (INE) and must be cited as INE's: every DataResponse
+  carries its citation (DataResponse.citation).
+title: "pyptine: a Python client for the API of Statistics Portugal (INE)"
+type: software
+authors:
+  - family-names: Randsley
+    given-names: Nigel
+    email: nigel.randsley@protonmail.com
+repository-code: "https://github.com/randsley/pyptine"
+license: MIT
+keywords:
+  - Statistics Portugal
+  - INE
+  - official statistics
+  - Portugal

@@ -463,7 +463,7 @@ To set up the development environment:
 
 ```bash
 # Clone the repository
-git clone https://github.com/nigelrandsley/pyptine.git
+git clone https://github.com/randsley/pyptine.git
 cd pyptine
 
 # Install in editable mode with development dependencies

@@ -1,23 +1,22 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyptine"
-version = "0.3.3"
-description = "High-level Python client for INE Portugal (Statistics Portugal) API"
-authors = [{name = "Nigel Randsley", email = "nigel.randsley@gmail.com"}]
+dynamic = ["version"]
+description = "Python client for the API of Statistics Portugal (INE): catalogue, metadata, data, with provenance"
+authors = [{name = "Nigel Randsley", email = "nigel.randsley@protonmail.com"}]
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.9"
 keywords = ["ine", "portugal", "statistics", "data", "api"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -33,7 +32,6 @@ dependencies = [
     "pandas>=1.5.0",
     "click>=8.0.0",
     "requests-cache>=1.0.0",
-    "lxml>=4.9.0",
     "pydantic>=2.0.0",
     "platformdirs>=3.0.0",
     "rich>=13.0.0",
@@ -58,23 +56,22 @@ dev = [
 excel = [
     "openpyxl>=3.0.0",
 ]
-docs = [
-    "sphinx>=6.0.0",
-    "sphinx-rtd-theme>=1.2.0",
-    "sphinx-click>=4.4.0",
-]
 
 [project.scripts]
 pyptine = "pyptine.cli.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/nigelrandsley/pyptine"
-Documentation = "https://pyptine.readthedocs.io"
-Repository = "https://github.com/nigelrandsley/pyptine"
-"Bug Tracker" = "https://github.com/nigelrandsley/pyptine/issues"
+Homepage = "https://github.com/randsley/pyptine"
+Repository = "https://github.com/randsley/pyptine"
+Issues = "https://github.com/randsley/pyptine/issues"
+Changelog = "https://github.com/randsley/pyptine/blob/main/CHANGELOG.md"
+
+[tool.setuptools.dynamic]
+version = {attr = "pyptine.__version__.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["pyptine*"]  # not src/examples: it would install a top-level "examples"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

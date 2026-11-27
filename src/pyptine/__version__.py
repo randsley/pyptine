@@ -1,3 +1,4 @@
 """Version information for pyptine package."""
 
-__version__ = "0.3.2"
+# The only place the version is set (pyproject.toml reads it). ".dev0": unreleased.
+__version__ = "0.4.0.dev0"
