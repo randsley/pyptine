@@ -4,7 +4,7 @@ import html
 import logging
 import re
 from datetime import datetime
-from typing import Any, Optional, cast
+from typing import Any, cast
 from xml.etree import ElementTree as ET
 
 from pyptine.client.base import INEClient
@@ -157,7 +157,7 @@ class CatalogueClient(INEClient):
             logger.error(f"Failed to get main indicators: {str(e)}")
             raise
 
-    def get_complete_catalogue(self, progress_callback: Optional[Any] = None) -> list[Indicator]:
+    def get_complete_catalogue(self, progress_callback: Any | None = None) -> list[Indicator]:
         """Get the complete catalogue of indicators.
 
         Args:
@@ -200,9 +200,9 @@ class CatalogueClient(INEClient):
 
     def get_catalogue_response(
         self,
-        varcd: Optional[str] = None,
+        varcd: str | None = None,
         complete: bool = False,
-        progress_callback: Optional[Any] = None,
+        progress_callback: Any | None = None,
     ) -> CatalogueResponse:
         """Catalogue indicators with INE's extraction date and the request URL.
 
@@ -290,7 +290,7 @@ class CatalogueClient(INEClient):
                     f"{len(keywords)} could be matched to their raw <keywords>"
                 )
 
-            for indicator_elem, (kw_varcd, kws) in zip(indicator_elements, keywords):
+            for indicator_elem, (kw_varcd, kws) in zip(indicator_elements, keywords, strict=True):
                 indicator = self._parse_indicator_xml(indicator_elem)
                 if indicator:
                     if kw_varcd != indicator.varcd:
@@ -311,7 +311,7 @@ class CatalogueClient(INEClient):
             logger.error(f"Failed to parse XML response: {str(e)}")
             raise DataProcessingError(f"Failed to parse catalogue: {str(e)}") from e
 
-    def _parse_indicator_xml(self, indicator_elem: ET.Element) -> Optional[Indicator]:
+    def _parse_indicator_xml(self, indicator_elem: ET.Element) -> Indicator | None:
         """Parse a single <indicator> element into an Indicator.
 
         Args:

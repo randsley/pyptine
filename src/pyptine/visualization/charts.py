@@ -1,7 +1,7 @@
 """Chart creation functions for indicator data visualization."""
 
 import logging
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 try:
     import plotly.express as px
@@ -26,9 +26,9 @@ def plot_indicator(
     x_column: str = "period",
     y_column: str = "value",
     chart_type: str = "line",
-    color_column: Optional[str] = None,
+    color_column: str | None = None,
     **kwargs: Any,
-) -> Optional[Any]:
+) -> Any | None:
     """Create a visualization of indicator data.
 
     Creates an interactive plotly chart for the given data. Supports multiple
@@ -121,7 +121,7 @@ def plot_line_chart(
     title: str = "Line Chart",
     x_column: str = "period",
     y_column: str = "value",
-    color_column: Optional[str] = None,
+    color_column: str | None = None,
     markers: bool = True,
     **kwargs: Any,
 ) -> Any:
@@ -177,7 +177,7 @@ def plot_bar_chart(
     title: str = "Bar Chart",
     x_column: str = "period",
     y_column: str = "value",
-    color_column: Optional[str] = None,
+    color_column: str | None = None,
     **kwargs: Any,
 ) -> Any:
     """Create an interactive bar chart.
@@ -230,7 +230,7 @@ def plot_area_chart(
     title: str = "Area Chart",
     x_column: str = "period",
     y_column: str = "value",
-    color_column: Optional[str] = None,
+    color_column: str | None = None,
     **kwargs: Any,
 ) -> Any:
     """Create an interactive area chart.
@@ -283,8 +283,8 @@ def plot_scatter_chart(
     title: str = "Scatter Chart",
     x_column: str = "period",
     y_column: str = "value",
-    color_column: Optional[str] = None,
-    size_column: Optional[str] = None,
+    color_column: str | None = None,
+    size_column: str | None = None,
     **kwargs: Any,
 ) -> Any:
     """Create an interactive scatter chart.

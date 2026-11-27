@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, TextIO
+from typing import Any, TextIO
 
 import pandas as pd
 
@@ -16,7 +16,7 @@ def export_to_csv(
     df: pd.DataFrame,
     filepath: Path,
     include_metadata: bool = True,
-    metadata: Optional[dict[str, Any]] = None,
+    metadata: dict[str, Any] | None = None,
     encoding: str = "utf-8-sig",
     **kwargs: Any,
 ) -> None:

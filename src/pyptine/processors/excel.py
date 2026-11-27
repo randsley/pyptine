@@ -4,7 +4,7 @@ import logging
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import pandas as pd
 
@@ -32,9 +32,9 @@ def _sheet_name(name: Any) -> str:
 
 def export_multiple_sheets(
     data_dict: Mapping[str, Union[pd.DataFrame, "DataResponse"]],
-    filepath: Union[str, Path],
+    filepath: str | Path,
     include_metadata: bool = True,
-    metadata: Optional[dict[str, Any]] = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
     """Export data to an Excel file, one sheet each, with a provenance sheet.
 

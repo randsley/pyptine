@@ -3,7 +3,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from pyptine.utils.exceptions import DataProcessingError
 
@@ -136,7 +136,7 @@ def export_to_jsonl(
 
 def read_jsonl(
     filepath: Path,
-    max_lines: Optional[int] = None,
+    max_lines: int | None = None,
 ) -> list[dict[str, Any]]:
     """Read JSON Lines file.
 

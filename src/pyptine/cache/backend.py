@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
 class CacheBackend(ABC):
@@ -12,7 +12,7 @@ class CacheBackend(ABC):
     """
 
     @abstractmethod
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get value from cache.
 
         Args:
@@ -24,7 +24,7 @@ class CacheBackend(ABC):
         pass
 
     @abstractmethod
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Set value in cache.
 
         Args:
@@ -61,7 +61,7 @@ class CacheBackend(ABC):
         pass
 
     @abstractmethod
-    def get_cache_dir(self) -> Optional[Path]:
+    def get_cache_dir(self) -> Path | None:
         """Get cache directory path.
 
         Returns:

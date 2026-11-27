@@ -2,7 +2,7 @@
 
 import platform
 import sys
-from typing import Any, Optional
+from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -71,7 +71,7 @@ def print_info(title: str, message: str = "") -> None:
     console.print(info_panel)
 
 
-def create_indicators_table(indicators: Any, limit: Optional[int] = None) -> Table:
+def create_indicators_table(indicators: Any, limit: int | None = None) -> Table:
     """Create a formatted table of indicators.
 
     Args:

@@ -12,7 +12,7 @@ e.g. "S7A2022"), which sorts chronologically within an indicator. Labels such as
 
 import logging
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 try:
     import pandas as pd
@@ -57,7 +57,7 @@ def _series_frame(
     return df.sort_values(by=period_column, kind="stable")
 
 
-def _year_earlier(period: Any) -> Optional[str]:
+def _year_earlier(period: Any) -> str | None:
     """The same period one year earlier, or None if the form is not recognised."""
     text = str(period)
     m = _INE_PERIOD.match(text)
@@ -107,9 +107,9 @@ def calculate_yoy_growth(
     if not data:
         return []
     df = _series_frame(data, value_column, period_column)
-    by_period = dict(zip(df[period_column].astype(str), df[value_column]))
-    growth: list[Optional[float]] = []
-    for period, value in zip(df[period_column], df[value_column]):
+    by_period = dict(zip(df[period_column].astype(str), df[value_column], strict=True))
+    growth: list[float | None] = []
+    for period, value in zip(df[period_column], df[value_column], strict=True):
         earlier = _year_earlier(period)
         if earlier is None:
             raise ValueError(

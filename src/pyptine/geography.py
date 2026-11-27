@@ -29,7 +29,6 @@ II code starts with ``0`` (checked 2026-11-27).
 """
 
 from collections.abc import Iterable
-from typing import Optional
 
 from pyptine.utils.exceptions import DataProcessingError
 
@@ -68,7 +67,7 @@ TOTAL = "total"
 PSEUDO_UNITS = (ABROAD, UNKNOWN, TOTAL)
 
 
-def pseudo_unit(code: str) -> Optional[str]:
+def pseudo_unit(code: str) -> str | None:
     """``"abroad"``, ``"unknown"`` or ``"total"`` if ``code`` is not a place, else None."""
     if code == "T":
         return TOTAL
@@ -84,7 +83,7 @@ def pseudo_unit(code: str) -> Optional[str]:
     return None
 
 
-def _district(code: str) -> Optional[str]:
+def _district(code: str) -> str | None:
     """The district of a municipality or parish code (first two characters of the DICO)."""
     n = len(code)
     if n in (4, 7):  # DICO is the last 4

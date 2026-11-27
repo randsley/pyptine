@@ -14,8 +14,8 @@ against the recorded responses in tests/fixtures/ine/:
 
 import logging
 import re
-from collections.abc import Mapping, Sequence
-from typing import Any, Callable, Optional, Union
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any
 
 from pyptine.geography import classify_geography
 from pyptine.models.indicator import Dimension, IndicatorMetadata
@@ -26,7 +26,7 @@ from pyptine.utils.exceptions import DataProcessingError, DimensionError, INERef
 logger = logging.getLogger(__name__)
 
 #: A dimension filter value: one code, a comma-separated string of codes, or a list of codes.
-DimensionValueFilter = Union[str, Sequence[str]]
+DimensionValueFilter = str | Sequence[str]
 DimensionFilters = Mapping[str, DimensionValueFilter]
 
 # A refusal's key as INE writes it ('"Falso" : ['). A label "Falso" is never followed by a colon.
@@ -47,7 +47,7 @@ def is_refusal_body(content: bytes) -> bool:
 _JAVA_ERROR = re.compile(rb"^\s*<pre>\s*(java\.[\w.$]+(?:Exception|Error))")
 
 
-def java_error(content: bytes) -> Optional[str]:
+def java_error(content: bytes) -> str | None:
     """The Java exception name if ``content`` is INE's error page, else None."""
     m = _JAVA_ERROR.match(content[:500])
     return m.group(1).decode("ascii", "replace") if m else None
@@ -214,7 +214,7 @@ def process_data_point(data_point: dict[str, Any]) -> dict[str, Any]:
     return processed
 
 
-def _to_float(value: Any) -> Optional[float]:
+def _to_float(value: Any) -> float | None:
     if value is None:
         return None
     if isinstance(value, (int, float)):
@@ -231,11 +231,11 @@ def _to_float(value: Any) -> Optional[float]:
 
 def parse_data_response(
     varcd: str,
-    response: Union[dict[str, Any], list[Any]],
+    response: dict[str, Any] | list[Any],
     language: str,
-    get_metadata: Callable[[], Optional[IndicatorMetadata]],
-    url: Optional[str] = None,
-    dimensions: Optional[Mapping[str, str]] = None,
+    get_metadata: Callable[[], IndicatorMetadata | None],
+    url: str | None = None,
+    dimensions: Mapping[str, str] | None = None,
 ) -> DataResponse:
     """Parse a data response into a DataResponse.
 
@@ -259,13 +259,13 @@ def parse_data_response(
     """
     check_success(response, varcd)
     rows: list[dict[str, Any]] = []
-    metadata: Optional[IndicatorMetadata] = None
+    metadata: IndicatorMetadata | None = None
     extracted = None
-    last_updated: Optional[str] = None
-    metadata_url: Optional[str] = None
-    geo_classification: Optional[str] = None
+    last_updated: str | None = None
+    metadata_url: str | None = None
+    geo_classification: str | None = None
 
-    def meta() -> Optional[IndicatorMetadata]:
+    def meta() -> IndicatorMetadata | None:
         nonlocal metadata
         if metadata is None:
             metadata = get_metadata()

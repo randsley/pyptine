@@ -18,6 +18,7 @@ ignores `start`/`count`). Ordered by effect on users.
 - Provenance in what is written: INE's `DataExtracao`, request URL, filters, periods, licence and citation in `DataResponse`, the CSV header and JSON; `cache_ttl` honoured. Excel export with a Provenance sheet; the catalogue's date is INE's.
 - Examples rewritten against verified indicators; each runs end to end.
 - Old-format parsing removed; every test runs on recorded INE responses.
+- Python 3.10 is the minimum (3.9 is past end of life).
 - Package metadata: repository URLs, public contact email, one version source (0.4.0.dev0), CITATION.cff; the wheel no longer installs a top-level `examples`.
 - District geographies (0004167) told from NUTS; the catalogue's Java error page for unknown codes refused at once.
 - Geographic levels from codes: `DataResponse.with_geo_level()` / `at_level()`.
@@ -27,7 +28,7 @@ ignores `start`/`count`). Ordered by effect on users.
 
 ## Open
 
-1. **CI.** Update actions (checkout v3, setup-python v4, codecov v3); Python 3.9 is past end of life; consider a scheduled run with live tests (the `live` marker is declared but unused).
+1. **CI.** Update actions (checkout v3, setup-python v4, codecov v3); consider a scheduled run with live tests (the `live` marker is declared but unused).
 2. **Smaller.**
     - The CLI's `search --timeout` defaults to 10 s (the catalogue download takes ~20 s; the timeout is per read, so it works, but the help text says "Request timeout").
     - The catalogue's `<extraction_date>` has no timezone. On 2026-11-27 it matched the data endpoint's UTC `DataExtracao`, but Lisbon is UTC+0 then: compare again in summer (after 2027-03-28) to learn whether it is UTC or Lisbon time.

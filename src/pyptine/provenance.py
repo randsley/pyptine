@@ -10,7 +10,7 @@ import re
 import urllib.parse
 from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pyptine.utils.exceptions import DataProcessingError
 
@@ -146,7 +146,7 @@ def ine_citation(*responses: "DataResponse") -> str:
             if "period_code" in row:
                 periods.setdefault(str(row["period_code"]), str(row.get("period", "")))
     labels = [periods[code] or code for code in sorted(periods)]
-    date: Optional[datetime] = min(r.extraction_date for r in responses if r.extraction_date)
+    date: datetime | None = min(r.extraction_date for r in responses if r.extraction_date)
     assert date is not None
     text = "Source: Statistics Portugal (INE), indicator"
     text += (" " if len(codes) == 1 else "s ") + ", ".join(codes)

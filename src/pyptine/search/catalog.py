@@ -1,7 +1,7 @@
 """Catalogue browsing and search functionality for pyine."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from pyptine.client.catalogue import CatalogueClient
 from pyptine.models.indicator import Indicator
@@ -37,7 +37,7 @@ class CatalogueBrowser:
         """
         self.client = client
         self.language = language
-        self._cached_indicators: Optional[list[Indicator]] = None
+        self._cached_indicators: list[Indicator] | None = None
 
     def is_catalogue_cached(self) -> bool:
         """Check if catalogue is cached (memory or disk).
@@ -53,7 +53,7 @@ class CatalogueBrowser:
         return self.client.is_catalogue_cached_on_disk()
 
     def get_all_indicators(
-        self, use_cache: bool = True, progress_callback: Optional[Any] = None
+        self, use_cache: bool = True, progress_callback: Any | None = None
     ) -> list[Indicator]:
         """Get all available indicators from catalogue.
 
@@ -84,12 +84,12 @@ class CatalogueBrowser:
     def search(
         self,
         query: str,
-        search_fields: Optional[list[str]] = None,
+        search_fields: list[str] | None = None,
         case_sensitive: bool = False,
         exact_match: bool = False,
-        theme: Optional[str] = None,
-        subtheme: Optional[str] = None,
-        progress_callback: Optional[Any] = None,
+        theme: str | None = None,
+        subtheme: str | None = None,
+        progress_callback: Any | None = None,
     ) -> list[Indicator]:
         """Search indicators by text query, with optional theme/subtheme filtering.
 
@@ -211,7 +211,7 @@ class CatalogueBrowser:
 
         return False
 
-    def list_themes(self, progress_callback: Optional[Any] = None) -> list[str]:
+    def list_themes(self, progress_callback: Any | None = None) -> list[str]:
         """Get list of all unique themes in catalogue.
 
         Args:
@@ -235,7 +235,7 @@ class CatalogueBrowser:
 
         return sorted(themes)
 
-    def list_subthemes(self, theme: Optional[str] = None) -> list[str]:
+    def list_subthemes(self, theme: str | None = None) -> list[str]:
         """Get list of subthemes, optionally filtered by theme.
 
         Args:
@@ -287,7 +287,7 @@ class CatalogueBrowser:
 
         return sorted_indicators[:limit]
 
-    def get_by_code(self, varcd: str) -> Optional[Indicator]:
+    def get_by_code(self, varcd: str) -> Indicator | None:
         """Get indicator by code.
 
         Args:

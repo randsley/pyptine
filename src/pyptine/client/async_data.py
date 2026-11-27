@@ -3,7 +3,7 @@
 import logging
 import warnings
 from collections.abc import AsyncIterator
-from typing import Any, Optional, Union, cast
+from typing import Any, cast
 
 from pyptine.client import parsing
 from pyptine.client.async_base import AsyncINEClient
@@ -37,7 +37,7 @@ class AsyncDataClient(AsyncINEClient):
         self,
         language: str = "EN",
         timeout: int = AsyncINEClient.DEFAULT_TIMEOUT,
-        metadata_client: Optional[MetadataClient] = None,
+        metadata_client: MetadataClient | None = None,
     ):
         super().__init__(language, timeout)
         if metadata_client is None:
@@ -55,7 +55,7 @@ class AsyncDataClient(AsyncINEClient):
     async def get_data(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
     ) -> DataResponse:
         """Fetch indicator data asynchronously (see ``DataClient.get_data``)."""
         logger.info(f"Fetching data asynchronously for indicator {varcd}")
@@ -64,7 +64,7 @@ class AsyncDataClient(AsyncINEClient):
             self.DATA_ENDPOINT, params=params, response_format="json"
         )
         data_response = self._parse_data_response(
-            varcd, cast(Union[dict[str, Any], list[dict[str, Any]]], raw_response), params
+            varcd, cast(dict[str, Any] | list[dict[str, Any]], raw_response), params
         )
         logger.info(f"Retrieved {len(data_response.data)} data points for {varcd}")
         return data_response
@@ -72,9 +72,9 @@ class AsyncDataClient(AsyncINEClient):
     async def get_all_data(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
         periods_per_request: int = DEFAULT_PERIODS_PER_REQUEST,
-        chunk_size: Optional[int] = None,
+        chunk_size: int | None = None,
     ) -> AsyncIterator[DataResponse]:
         """Fetch every period, a batch of periods per request (see ``DataClient.get_all_data``).
 
@@ -100,7 +100,7 @@ class AsyncDataClient(AsyncINEClient):
     def _build_params(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
     ) -> dict[str, str]:
         """Build query parameters for a data request, validating the dimension filters."""
         params = {"op": "2", "varcd": varcd}
@@ -111,8 +111,8 @@ class AsyncDataClient(AsyncINEClient):
     def _parse_data_response(
         self,
         varcd: str,
-        response: Union[dict[str, Any], list[dict[str, Any]]],
-        params: Optional[dict[str, str]] = None,
+        response: dict[str, Any] | list[dict[str, Any]],
+        params: dict[str, str] | None = None,
     ) -> DataResponse:
         """Parse a data API response (see :func:`pyptine.client.parsing.parse_data_response`).
 

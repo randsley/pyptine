@@ -4,7 +4,7 @@ import logging
 import warnings
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, cast
 
 from pyptine.client import parsing
 from pyptine.client.base import INEClient
@@ -40,9 +40,9 @@ class DataClient(INEClient):
         language: str = "EN",
         timeout: int = INEClient.DEFAULT_TIMEOUT,
         cache_enabled: bool = True,
-        cache_dir: Optional[Path] = None,
-        metadata_client: Optional[MetadataClient] = None,
-        cache_ttl: Optional[int] = None,
+        cache_dir: Path | None = None,
+        metadata_client: MetadataClient | None = None,
+        cache_ttl: int | None = None,
     ):
         super().__init__(language, timeout, cache_enabled, cache_dir, cache_ttl=cache_ttl)
         if metadata_client is None:
@@ -61,7 +61,7 @@ class DataClient(INEClient):
     def get_data(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
     ) -> DataResponse:
         """Fetch indicator data with optional dimension filters.
 
@@ -85,7 +85,7 @@ class DataClient(INEClient):
         params = self._build_params(varcd, dimensions)
         raw_response = self._make_request(self.DATA_ENDPOINT, params=params, response_format="json")
         data_response = self._parse_data_response(
-            varcd, cast(Union[dict[str, Any], list[dict[str, Any]]], raw_response), params
+            varcd, cast(dict[str, Any] | list[dict[str, Any]], raw_response), params
         )
         logger.info(f"Retrieved {len(data_response.data)} data points for {varcd}")
         return data_response
@@ -93,9 +93,9 @@ class DataClient(INEClient):
     def get_all_data(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
         periods_per_request: int = DEFAULT_PERIODS_PER_REQUEST,
-        chunk_size: Optional[int] = None,
+        chunk_size: int | None = None,
     ) -> Iterator[DataResponse]:
         """Fetch every period of an indicator, a batch of periods per request.
 
@@ -132,7 +132,7 @@ class DataClient(INEClient):
     def _period_batches(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters],
+        dimensions: DimensionFilters | None,
         periods_per_request: int,
     ) -> Iterator[DimensionFilters]:
         if periods_per_request < 1:
@@ -148,7 +148,7 @@ class DataClient(INEClient):
     def _build_params(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
     ) -> dict[str, str]:
         """Build query parameters for a data request, validating the dimension filters.
 
@@ -163,8 +163,8 @@ class DataClient(INEClient):
     def _parse_data_response(
         self,
         varcd: str,
-        response: Union[dict[str, Any], list[dict[str, Any]]],
-        params: Optional[dict[str, str]] = None,
+        response: dict[str, Any] | list[dict[str, Any]],
+        params: dict[str, str] | None = None,
     ) -> DataResponse:
         """Parse a data API response (see :func:`pyptine.client.parsing.parse_data_response`).
 

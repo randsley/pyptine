@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Union, cast
+from typing import Any, cast
 
 from pyptine.client.base import INEClient
 from pyptine.models.indicator import (
@@ -117,9 +117,7 @@ class MetadataClient(INEClient):
             f"Available dimensions: {[d.id for d in dimensions]}"
         )
 
-    def _parse_metadata_response(
-        self, response: Union[dict[str, Any], list[Any]]
-    ) -> IndicatorMetadata:
+    def _parse_metadata_response(self, response: dict[str, Any] | list[Any]) -> IndicatorMetadata:
         """Parse metadata API response into IndicatorMetadata model.
 
         Args:

@@ -1,9 +1,10 @@
 """Command-line interface for pyptine."""
 
 import sys
+from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 import click
 from click import Context
@@ -104,10 +105,10 @@ def cli(ctx: Context) -> None:  # type: ignore[misc]
 @handle_exceptions
 def search(
     query: str,
-    theme: Optional[str],
-    subtheme: Optional[str],
+    theme: str | None,
+    subtheme: str | None,
     lang: str,
-    limit: Optional[int],
+    limit: int | None,
     timeout: int,
 ) -> None:
     """Search for indicators by keyword.
@@ -254,7 +255,7 @@ def info(varcd: str, lang: str) -> None:
 @handle_exceptions
 def download(
     varcd: str,
-    output: Optional[str],
+    output: str | None,
     output_format: str,
     lang: str,
     no_metadata: bool,
@@ -461,7 +462,7 @@ def list_themes(lang: str) -> None:
     help="Maximum number of indicators to display",
 )
 @handle_exceptions
-def list_indicators(theme: Optional[str], lang: str, limit: int) -> None:
+def list_indicators(theme: str | None, lang: str, limit: int) -> None:
     """List available indicators."""
     ine = INE(language=lang, cache=True)
 

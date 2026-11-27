@@ -3,7 +3,7 @@
 import logging
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal
 
 from pyptine.client.base import INEClient
 from pyptine.client.catalogue import CatalogueClient
@@ -57,8 +57,8 @@ class INE:
         self,
         language: str = "EN",
         cache: bool = True,
-        cache_dir: Optional[Path] = None,
-        cache_ttl: Optional[int] = None,
+        cache_dir: Path | None = None,
+        cache_ttl: int | None = None,
         timeout: int = INEClient.DEFAULT_TIMEOUT,
     ):
         """Initialize INE client.
@@ -118,11 +118,11 @@ class INE:
     def search(
         self,
         query: str,
-        search_fields: Optional[list[str]] = None,
+        search_fields: list[str] | None = None,
         case_sensitive: bool = False,
-        theme: Optional[str] = None,
-        subtheme: Optional[str] = None,
-        progress_callback: Optional[Any] = None,
+        theme: str | None = None,
+        subtheme: str | None = None,
+        progress_callback: Any | None = None,
     ) -> list[Indicator]:
         """Search for indicators by keyword, with optional theme/subtheme filtering.
 
@@ -157,7 +157,7 @@ class INE:
     def get_data(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
     ) -> DataResponse:
         """Get indicator data.
 
@@ -196,7 +196,7 @@ class INE:
     def get_all_data(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
         periods_per_request: int = DataClient.DEFAULT_PERIODS_PER_REQUEST,
     ) -> Iterator[DataResponse]:
         """Get every period of an indicator, a batch of periods per request.
@@ -308,7 +308,7 @@ class INE:
         """
         return self.browser.validate_indicator(varcd)
 
-    def list_themes(self, progress_callback: Optional[Any] = None) -> list[str]:
+    def list_themes(self, progress_callback: Any | None = None) -> list[str]:
         """Get list of all themes in catalogue.
 
         Args:
@@ -336,8 +336,8 @@ class INE:
     def export_csv(
         self,
         varcd: str,
-        filepath: Union[str, Path],
-        dimensions: Optional[DimensionFilters] = None,
+        filepath: str | Path,
+        dimensions: DimensionFilters | None = None,
         include_metadata: bool = True,
     ) -> None:
         """Export indicator data to CSV file.
@@ -364,8 +364,8 @@ class INE:
     def export_excel(
         self,
         varcd: str,
-        filepath: Union[str, Path],
-        dimensions: Optional[DimensionFilters] = None,
+        filepath: str | Path,
+        dimensions: DimensionFilters | None = None,
         include_metadata: bool = True,
     ) -> None:
         """Export indicator data to an Excel file with a Provenance sheet (needs openpyxl).
@@ -390,8 +390,8 @@ class INE:
     def export_json(
         self,
         varcd: str,
-        filepath: Union[str, Path],
-        dimensions: Optional[DimensionFilters] = None,
+        filepath: str | Path,
+        dimensions: DimensionFilters | None = None,
         pretty: bool = True,
     ) -> None:
         """Export indicator data to JSON file.

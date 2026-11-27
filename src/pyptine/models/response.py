@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -24,9 +24,9 @@ class DataPoint(BaseModel):
     Represents one observation with its dimension values and the measured value.
     """
 
-    value: Optional[float] = Field(None, description="Measured value")
+    value: float | None = Field(None, description="Measured value")
     dimensions: dict[str, str] = Field(default_factory=dict, description="Dimension values")
-    unit: Optional[str] = Field(None, description="Unit of measurement")
+    unit: str | None = Field(None, description="Unit of measurement")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -52,19 +52,19 @@ class DataResponse(BaseModel):
     title: str = Field(..., description="Indicator name")
     language: str = Field(..., description="Language (PT or EN)")
     data: list[dict[str, Any]] = Field(default_factory=list, description="Raw data points")
-    unit: Optional[str] = Field(None, description="Unit of measurement")
-    extraction_date: Optional[datetime] = Field(
+    unit: str | None = Field(None, description="Unit of measurement")
+    extraction_date: datetime | None = Field(
         None, description="INE's extraction timestamp (DataExtracao, UTC)"
     )
-    last_updated: Optional[str] = Field(
+    last_updated: str | None = Field(
         None, description="INE's date of the indicator's last update (DataUltimoAtualizacao)"
     )
-    metadata_url: Optional[str] = Field(None, description="INE's metadata page (MetaInfUrl)")
-    url: Optional[str] = Field(None, description="The data request's URL")
+    metadata_url: str | None = Field(None, description="INE's metadata page (MetaInfUrl)")
+    url: str | None = Field(None, description="The data request's URL")
     dimensions: dict[str, str] = Field(
         default_factory=dict, description="Dimension filters sent (cat_id codes, comma-joined)"
     )
-    geo_classification: Optional[str] = Field(
+    geo_classification: str | None = Field(
         default=None,
         description="Classification of the geography (Dim2): 'nuts' or 'district', from the "
         "codes of its metadata (see pyptine.geography.classify_geography)",
@@ -158,7 +158,7 @@ class DataResponse(BaseModel):
 
     def to_csv(
         self,
-        filepath: Union[str, Path],
+        filepath: str | Path,
         include_metadata: bool = True,
         **kwargs: Any,
     ) -> None:
@@ -179,7 +179,7 @@ class DataResponse(BaseModel):
 
     def to_excel(
         self,
-        filepath: Union[str, Path],
+        filepath: str | Path,
         include_metadata: bool = True,
         sheet_name: str = "Data",
     ) -> None:
@@ -198,7 +198,7 @@ class DataResponse(BaseModel):
 
     def to_json(
         self,
-        filepath: Union[str, Path],
+        filepath: str | Path,
         pretty: bool = True,
         **kwargs: Any,
     ) -> None:
@@ -220,7 +220,7 @@ class DataResponse(BaseModel):
         """
         return self.model_dump(mode="python")
 
-    def with_geo_level(self, classification: Optional[str] = None) -> "DataResponse":
+    def with_geo_level(self, classification: str | None = None) -> "DataResponse":
         """A copy whose rows carry ``geo_level``, read from their ``geocod``.
 
         Values: ``country``, ``nuts1``, ``nuts2``, ``nuts3``, ``district``, ``municipality``,
@@ -254,10 +254,13 @@ class DataResponse(BaseModel):
             )
         codes = [str(r["geocod"]) for r in self.data]
         check_codes(codes, scheme)
-        rows = [{**r, "geo_level": level_or_pseudo(c, scheme)} for r, c in zip(self.data, codes)]
+        rows = [
+            {**r, "geo_level": level_or_pseudo(c, scheme)}
+            for r, c in zip(self.data, codes, strict=True)
+        ]
         return self.model_copy(update={"data": rows})
 
-    def at_level(self, *levels: str, classification: Optional[str] = None) -> "DataResponse":
+    def at_level(self, *levels: str, classification: str | None = None) -> "DataResponse":
         """A copy with only the rows at the given levels, e.g. ``at_level("municipality")``.
 
         Levels are those of :meth:`with_geo_level` (places or pseudo-units).
@@ -414,7 +417,7 @@ class DataResponse(BaseModel):
         chart_type: str = "line",
         x_column: str = "period",
         y_column: str = "value",
-        color_column: Optional[str] = None,
+        color_column: str | None = None,
         **kwargs: Any,
     ) -> Any:
         """Create an interactive visualization of the indicator data.
@@ -462,7 +465,7 @@ class DataResponse(BaseModel):
         self,
         x_column: str = "period",
         y_column: str = "value",
-        color_column: Optional[str] = None,
+        color_column: str | None = None,
         markers: bool = True,
         **kwargs: Any,
     ) -> Any:
@@ -499,7 +502,7 @@ class DataResponse(BaseModel):
         self,
         x_column: str = "period",
         y_column: str = "value",
-        color_column: Optional[str] = None,
+        color_column: str | None = None,
         **kwargs: Any,
     ) -> Any:
         """Create an interactive bar chart of the indicator data.
@@ -533,7 +536,7 @@ class DataResponse(BaseModel):
         self,
         x_column: str = "period",
         y_column: str = "value",
-        color_column: Optional[str] = None,
+        color_column: str | None = None,
         **kwargs: Any,
     ) -> Any:
         """Create an interactive area chart of the indicator data.
@@ -567,8 +570,8 @@ class DataResponse(BaseModel):
         self,
         x_column: str = "period",
         y_column: str = "value",
-        color_column: Optional[str] = None,
-        size_column: Optional[str] = None,
+        color_column: str | None = None,
+        size_column: str | None = None,
         **kwargs: Any,
     ) -> Any:
         """Create an interactive scatter chart of the indicator data.
@@ -638,7 +641,7 @@ class CatalogueResponse(BaseModel):
     extraction_date: datetime = Field(
         ..., description="INE's catalogue <extraction_date> (INE's clock, timezone not stated)"
     )
-    url: Optional[str] = Field(None, description="The catalogue request's URL")
+    url: str | None = Field(None, description="The catalogue request's URL")
     total_count: int = Field(0, description="Total number of indicators")
 
     @computed_field  # type: ignore[prop-decorator]

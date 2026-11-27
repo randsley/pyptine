@@ -4,7 +4,7 @@ import logging
 import time
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, cast
 from xml.etree import ElementTree as ET
 
 import requests
@@ -69,10 +69,10 @@ class INEClient:
         language: str = "EN",
         timeout: int = DEFAULT_TIMEOUT,
         cache_enabled: bool = True,
-        cache_dir: Optional[Path] = None,
+        cache_dir: Path | None = None,
         max_retries: int = MAX_RETRIES,
-        retry_delays: Optional[Sequence[float]] = None,
-        cache_ttl: Optional[int] = None,
+        retry_delays: Sequence[float] | None = None,
+        cache_ttl: int | None = None,
     ) -> None:
         """Initialize INE client."""
         self.language = language.upper()
@@ -150,10 +150,10 @@ class INEClient:
     def _make_request(
         self,
         endpoint: str,
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         response_format: str = "json",
-        progress_callback: Optional[Any] = None,
-    ) -> Union[dict[str, Any], str]:
+        progress_callback: Any | None = None,
+    ) -> dict[str, Any] | str:
         """Make HTTP request to INE API, retrying INE's transient failures.
 
         Args:
@@ -200,8 +200,8 @@ class INEClient:
         url: str,
         params: dict[str, Any],
         response_format: str,
-        progress_callback: Optional[Any],
-    ) -> Union[dict[str, Any], str]:
+        progress_callback: Any | None,
+    ) -> dict[str, Any] | str:
         """One request. Raises retry.RetryableError for a failure worth repeating."""
         timeout = (retry.connect_timeout(self.timeout), self.timeout)
         attempts = len(self._waits()) + 1
@@ -243,7 +243,7 @@ class INEClient:
             check_catalogue_body(response.content, str(params.get("varcd", "")), response.url)
         try:
             if response_format == "json":
-                body: Union[dict[str, Any], str] = self._parse_json_response(response)
+                body: dict[str, Any] | str = self._parse_json_response(response)
             else:
                 body = self._parse_xml_response(response)
                 ET.fromstring(body)  # a truncated catalogue must not be returned or cached

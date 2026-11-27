@@ -33,8 +33,9 @@ import pathlib
 import re
 import sys
 import time
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 from xml.etree import ElementTree as ET
 
 import requests

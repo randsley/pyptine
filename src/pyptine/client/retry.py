@@ -16,7 +16,6 @@ HTTP errors, and refusals.
 """
 
 from collections.abc import Mapping, Sequence
-from typing import Optional
 
 #: HTTP statuses retried.
 RETRY_STATUS = frozenset({404, 429, 500, 502, 503, 504})
@@ -37,7 +36,7 @@ DEFAULT_TIMEOUT = 130
 CONNECT_TIMEOUT = 10.0
 
 
-def waits(retry_delays: Optional[Sequence[float]], max_retries: int) -> list[float]:
+def waits(retry_delays: Sequence[float] | None, max_retries: int) -> list[float]:
     """The wait before each retry: ``retry_delays``, its last value repeated if needed."""
     delays = tuple(RETRY_DELAYS if retry_delays is None else retry_delays)
     if max_retries <= 0:
@@ -47,7 +46,7 @@ def waits(retry_delays: Optional[Sequence[float]], max_retries: int) -> list[flo
     return [float(delays[min(i, len(delays) - 1)]) for i in range(max_retries)]
 
 
-def wait_for(status: Optional[int], headers: Mapping[str, str], delay: float) -> float:
+def wait_for(status: int | None, headers: Mapping[str, str], delay: float) -> float:
     """Wait before a retry: ``delay``, or longer if a 429 asks for it with Retry-After."""
     if status == 429:
         value = headers.get("Retry-After", "")
@@ -88,8 +87,8 @@ class RetryableError(Exception):
     def __init__(
         self,
         error: Exception,
-        status: Optional[int] = None,
-        headers: Optional[Mapping[str, str]] = None,
+        status: int | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         # The message is the short reason logged before a retry; ``error`` is the final error.
         super().__init__(f"HTTP {status}" if status is not None else str(error))

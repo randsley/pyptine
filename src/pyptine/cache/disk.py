@@ -4,7 +4,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import requests_cache
 from platformdirs import user_cache_dir
@@ -54,7 +54,7 @@ class DiskCache(CacheBackend):
 
     def __init__(
         self,
-        cache_dir: Optional[Path] = None,
+        cache_dir: Path | None = None,
         metadata_ttl: int = DEFAULT_METADATA_TTL,
         data_ttl: int = DEFAULT_DATA_TTL,
     ) -> None:
@@ -102,7 +102,7 @@ class DiskCache(CacheBackend):
             filter_fn=_cacheable,
         )
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get value from cache.
 
         Args:
@@ -115,7 +115,7 @@ class DiskCache(CacheBackend):
         # This is here to satisfy the interface
         return None
 
-    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Set value in cache.
 
         Args:

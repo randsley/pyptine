@@ -40,7 +40,7 @@ Enhancement suggestions are welcome! Please provide:
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.10 or higher
 - pip
 
 ### Getting Started

@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Sequence
-from typing import Any, Optional, Union
+from typing import Any
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -46,14 +46,14 @@ class AsyncINEClient:
         language: str = "EN",
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = MAX_RETRIES,
-        retry_delays: Optional[Sequence[float]] = None,
+        retry_delays: Sequence[float] | None = None,
     ) -> None:
         """Initialize async INE client."""
         self.language = language.upper()
         self.timeout = timeout
         self.max_retries = max_retries
         self.retry_delays = retry_delays
-        self.client: Optional[httpx.AsyncClient] = None
+        self.client: httpx.AsyncClient | None = None
 
         # Validate language
         if self.language not in ("EN", "PT"):
@@ -89,9 +89,9 @@ class AsyncINEClient:
     async def _make_request(
         self,
         endpoint: str,
-        params: Optional[dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         response_format: str = "json",
-    ) -> Union[dict[str, Any], str]:
+    ) -> dict[str, Any] | str:
         """Make an async HTTP request to INE API, retrying INE's transient failures.
 
         Raises:
@@ -126,7 +126,7 @@ class AsyncINEClient:
 
     async def _attempt(
         self, url: str, params: dict[str, Any], response_format: str, attempts: int
-    ) -> Union[dict[str, Any], str]:
+    ) -> dict[str, Any] | str:
         """One request. Raises retry.RetryableError for a failure worth repeating."""
         assert self.client is not None
         start_time = time.time()
@@ -160,7 +160,7 @@ class AsyncINEClient:
             check_catalogue_body(response.content, str(params.get("varcd", "")), str(response.url))
         try:
             if response_format == "json":
-                body: Union[dict[str, Any], str] = self._parse_json_response(response)
+                body: dict[str, Any] | str = self._parse_json_response(response)
             else:
                 body = self._parse_xml_response(response)
                 ET.fromstring(body)

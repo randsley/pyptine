@@ -2,7 +2,7 @@
 
 import logging
 import warnings
-from typing import Any, Optional, Union, cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -88,7 +88,7 @@ def json_to_dataframe(
 def pivot_by_dimension(
     df: pd.DataFrame,
     dimension: str,
-    value_column: Union[str, list[str]] = "value",
+    value_column: str | list[str] = "value",
     aggfunc: str = "first",
 ) -> pd.DataFrame:
     """Pivot DataFrame by specific dimension.
@@ -139,7 +139,7 @@ def pivot_by_dimension(
 def clean_dataframe(
     df: pd.DataFrame,
     drop_internal_columns: bool = True,
-    rename_columns: Optional[dict[str, str]] = None,
+    rename_columns: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Clean and standardize DataFrame.
 
@@ -236,8 +236,8 @@ def _parse_date_column(series: pd.Series) -> pd.Series:
 def aggregate_by_period(
     df: pd.DataFrame,
     period_column: str = "period_code",
-    value_column: Union[str, list[str]] = "value",
-    agg_func: Union[str, list[str]] = "sum",
+    value_column: str | list[str] = "value",
+    agg_func: str | list[str] = "sum",
 ) -> pd.DataFrame:
     """Aggregate data by time period.
 
@@ -282,7 +282,7 @@ def aggregate_by_period(
 def filter_by_geography(
     df: pd.DataFrame,
     geography: str,
-    geography_column: Optional[str] = None,
+    geography_column: str | None = None,
 ) -> pd.DataFrame:
     """Filter DataFrame by geographic region.
 

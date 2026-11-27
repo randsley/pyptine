@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import AsyncIterator
-from typing import Any, Optional
+from typing import Any
 
 from pyptine.client.async_base import AsyncINEClient
 from pyptine.client.async_data import AsyncDataClient
@@ -48,8 +48,8 @@ class AsyncINE:
         """Initialize async INE client."""
         self.language = language.upper()
         self.timeout = timeout
-        self.data_client: Optional[AsyncDataClient] = None
-        self.metadata_client: Optional[MetadataClient] = None
+        self.data_client: AsyncDataClient | None = None
+        self.metadata_client: MetadataClient | None = None
 
         # Validate language
         if self.language not in ("EN", "PT"):
@@ -79,7 +79,7 @@ class AsyncINE:
     async def get_data(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
     ) -> DataResponse:
         """Fetch indicator data asynchronously.
 
@@ -109,7 +109,7 @@ class AsyncINE:
     async def get_all_data(
         self,
         varcd: str,
-        dimensions: Optional[DimensionFilters] = None,
+        dimensions: DimensionFilters | None = None,
         periods_per_request: int = AsyncDataClient.DEFAULT_PERIODS_PER_REQUEST,
     ) -> AsyncIterator[DataResponse]:
         """Fetch every period of an indicator, a batch of periods per request.
