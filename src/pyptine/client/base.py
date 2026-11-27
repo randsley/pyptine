@@ -50,6 +50,8 @@ class INEClient:
         max_retries: Retries after the first attempt (default 3)
         retry_delays: Waits before each retry in seconds (default ``RETRY_DELAYS``; the last
             value repeats if there are more retries)
+        cache_ttl: How long data responses stay cached, in seconds (default 1 day). Metadata
+            and catalogue responses stay 7 days.
 
     Example:
         >>> client = INEClient(language="EN")
@@ -70,6 +72,7 @@ class INEClient:
         cache_dir: Optional[Path] = None,
         max_retries: int = MAX_RETRIES,
         retry_delays: Optional[Sequence[float]] = None,
+        cache_ttl: Optional[int] = None,
     ) -> None:
         """Initialize INE client."""
         self.language = language.upper()
@@ -87,7 +90,10 @@ class INEClient:
         # Initialize cache if enabled
         if self.cache_enabled:
             disk_cache = _get_disk_cache()
-            self.cache = disk_cache(cache_dir=cache_dir)
+            if cache_ttl is None:
+                self.cache = disk_cache(cache_dir=cache_dir)
+            else:
+                self.cache = disk_cache(cache_dir=cache_dir, data_ttl=cache_ttl)
             logger.debug(f"Cache enabled at: {self.cache.get_cache_dir()}")
 
         # Initialize session

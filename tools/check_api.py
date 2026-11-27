@@ -79,6 +79,8 @@ READ_DATA = {
     "IndicadorCod": "str",
     "IndicadorDsg": "str",
     "DataExtracao": "str",
+    "DataUltimoAtualizacao": "str",
+    "MetaInfUrl": "str",
     "Dados": "obj",
     "Sucesso": "obj",
 }
@@ -398,10 +400,23 @@ def check_failures() -> None:
             error(f"{where}: no Sucesso.Falso; INE used to refuse this with HTTP 200")
 
 
+# The catalogue's <extraction_date>, which CatalogueResponse needs (pyptine.provenance
+# parse_catalogue_date): one English form under either language, no timezone.
+CATALOGUE_DATE = re.compile(
+    r"^[A-Z][a-z]+, \d{1,2} [A-Z][a-z]+ \d{4}, \d{2}:\d{2}:\d{2}(\.\d{1,6})? (AM|PM)$"
+)
+
+
 def parse_catalogue(where: str, xml: str) -> list[ET.Element]:
     root = ET.fromstring(xml)
     if root.tag != "catalog":
         error(f"{where}: root element is <{root.tag}>, expected <catalog>")
+    date = (root.findtext("extraction_date") or "").strip()
+    if not CATALOGUE_DATE.match(date):
+        error(
+            f"{where}: <extraction_date> {date!r} is not 'Friday, 27 November 2026, "
+            "04:17:58.067 PM', which CatalogueResponse parses"
+        )
     return root.findall(".//indicator")
 
 

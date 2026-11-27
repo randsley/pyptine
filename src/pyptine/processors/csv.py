@@ -1,7 +1,7 @@
 """CSV export functionality for pyptine."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, TextIO
 
@@ -81,8 +81,9 @@ def _write_metadata_header(file_handle: TextIO, metadata: dict[str, Any]) -> Non
         metadata: Metadata dictionary
     """
     # Write header
-    file_handle.write("# INE Portugal Data Export\n")
-    file_handle.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    file_handle.write("# Statistics Portugal (INE) data export\n")
+    # When the file was written (local clock, UTC). The data's own date is INE's, below.
+    file_handle.write(f"# written: {datetime.now(timezone.utc).isoformat(timespec='seconds')}\n")
     file_handle.write("#\n")
 
     # Write metadata fields
@@ -123,7 +124,7 @@ def read_csv_with_metadata(
                     break
 
                 # Parse metadata lines (format: "# key: value")
-                if ":" in line and not line.startswith("# Generated:"):
+                if ":" in line:
                     line = line.lstrip("#").strip()
                     if ":" in line:
                         key, value = line.split(":", 1)

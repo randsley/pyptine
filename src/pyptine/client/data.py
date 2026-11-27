@@ -12,6 +12,7 @@ from pyptine.client.metadata import MetadataClient
 from pyptine.client.parsing import DimensionFilters
 from pyptine.models.indicator import IndicatorMetadata
 from pyptine.models.response import DataResponse
+from pyptine.provenance import request_url
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,9 @@ class DataClient(INEClient):
         cache_enabled: bool = True,
         cache_dir: Optional[Path] = None,
         metadata_client: Optional[MetadataClient] = None,
+        cache_ttl: Optional[int] = None,
     ):
-        super().__init__(language, timeout, cache_enabled, cache_dir)
+        super().__init__(language, timeout, cache_enabled, cache_dir, cache_ttl=cache_ttl)
         if metadata_client is None:
             metadata_client = MetadataClient(language, timeout, cache_enabled, cache_dir)
         elif getattr(metadata_client, "language", self.language) != self.language:
@@ -83,7 +85,7 @@ class DataClient(INEClient):
         params = self._build_params(varcd, dimensions)
         raw_response = self._make_request(self.DATA_ENDPOINT, params=params, response_format="json")
         data_response = self._parse_data_response(
-            varcd, cast(Union[dict[str, Any], list[dict[str, Any]]], raw_response)
+            varcd, cast(Union[dict[str, Any], list[dict[str, Any]]], raw_response), params
         )
         logger.info(f"Retrieved {len(data_response.data)} data points for {varcd}")
         return data_response
@@ -159,11 +161,21 @@ class DataClient(INEClient):
         return params
 
     def _parse_data_response(
-        self, varcd: str, response: Union[dict[str, Any], list[dict[str, Any]]]
+        self,
+        varcd: str,
+        response: Union[dict[str, Any], list[dict[str, Any]]],
+        params: Optional[dict[str, str]] = None,
     ) -> DataResponse:
-        """Parse a data API response (see :func:`pyptine.client.parsing.parse_data_response`)."""
+        """Parse a data API response (see :func:`pyptine.client.parsing.parse_data_response`).
+
+        ``params`` (the request's query, without ``lang``) is recorded as provenance.
+        """
+        url = dims = None
+        if params is not None:
+            url = request_url(self.BASE_URL, self.DATA_ENDPOINT, {**params, "lang": self.language})
+            dims = {k: v for k, v in params.items() if k.startswith("Dim")}
         return parsing.parse_data_response(
-            varcd, response, self.language, lambda: self._metadata(varcd)
+            varcd, response, self.language, lambda: self._metadata(varcd), url, dims
         )
 
     def _process_data_point(self, data_point: dict[str, Any]) -> dict[str, Any]:

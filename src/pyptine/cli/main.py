@@ -229,9 +229,9 @@ def info(varcd: str, lang: str) -> None:
 @click.option(
     "--output-format",
     "-f",
-    type=click.Choice(["csv", "json"], case_sensitive=False),
+    type=click.Choice(["csv", "json", "xlsx"], case_sensitive=False),
     default="csv",
-    help="Output format (csv or json)",
+    help="Output format (csv, json or xlsx; xlsx needs openpyxl)",
 )
 @click.option(
     "--lang",
@@ -309,6 +309,8 @@ def download(
                 output_path,
                 include_metadata=not no_metadata,
             )
+        elif output_format.lower() == "xlsx":
+            response.to_excel(output_path, include_metadata=not no_metadata)
         else:  # json
             response.to_json(
                 output_path,

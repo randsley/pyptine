@@ -11,6 +11,7 @@ from pyptine.client.metadata import MetadataClient
 from pyptine.client.parsing import DimensionFilters
 from pyptine.models.indicator import IndicatorMetadata
 from pyptine.models.response import DataResponse
+from pyptine.provenance import request_url
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ class AsyncDataClient(AsyncINEClient):
             self.DATA_ENDPOINT, params=params, response_format="json"
         )
         data_response = self._parse_data_response(
-            varcd, cast(Union[dict[str, Any], list[dict[str, Any]]], raw_response)
+            varcd, cast(Union[dict[str, Any], list[dict[str, Any]]], raw_response), params
         )
         logger.info(f"Retrieved {len(data_response.data)} data points for {varcd}")
         return data_response
@@ -108,11 +109,21 @@ class AsyncDataClient(AsyncINEClient):
         return params
 
     def _parse_data_response(
-        self, varcd: str, response: Union[dict[str, Any], list[dict[str, Any]]]
+        self,
+        varcd: str,
+        response: Union[dict[str, Any], list[dict[str, Any]]],
+        params: Optional[dict[str, str]] = None,
     ) -> DataResponse:
-        """Parse a data API response (see :func:`pyptine.client.parsing.parse_data_response`)."""
+        """Parse a data API response (see :func:`pyptine.client.parsing.parse_data_response`).
+
+        ``params`` (the request's query, without ``lang``) is recorded as provenance.
+        """
+        url = dims = None
+        if params is not None:
+            url = request_url(self.BASE_URL, self.DATA_ENDPOINT, {**params, "lang": self.language})
+            dims = {k: v for k, v in params.items() if k.startswith("Dim")}
         return parsing.parse_data_response(
-            varcd, response, self.language, lambda: self._metadata(varcd)
+            varcd, response, self.language, lambda: self._metadata(varcd), url, dims
         )
 
     def _process_data_point(self, data_point: dict[str, Any]) -> dict[str, Any]:

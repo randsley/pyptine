@@ -8,6 +8,7 @@ from xml.etree import ElementTree as ET
 from pyptine.client.base import INEClient
 from pyptine.models.indicator import Indicator
 from pyptine.models.response import CatalogueResponse
+from pyptine.provenance import parse_catalogue_date, request_url
 from pyptine.utils.exceptions import DataProcessingError
 
 logger = logging.getLogger(__name__)
@@ -148,24 +149,63 @@ class CatalogueClient(INEClient):
             logger.error(f"Failed to get complete catalogue: {str(e)}")
             raise
 
-    def get_catalogue_response(self, varcd: Optional[str] = None) -> CatalogueResponse:
-        """Get catalogue response wrapped in CatalogueResponse model.
+    def get_catalogue_response(
+        self,
+        varcd: Optional[str] = None,
+        complete: bool = False,
+        progress_callback: Optional[Any] = None,
+    ) -> CatalogueResponse:
+        """Catalogue indicators with INE's extraction date and the request URL.
 
         Args:
-            varcd: Optional indicator code for single indicator
+            varcd: One indicator (``opc=1``)
+            complete: Without ``varcd``: the whole catalogue (``opc=2``, ~13,000 indicators,
+                ~20 s) instead of the main group (``opc=3``, whose titles are Portuguese
+                under either language)
+            progress_callback: Optional callback function(downloaded_bytes, total_bytes)
 
         Returns:
-            CatalogueResponse with list of indicators
+            CatalogueResponse whose ``extraction_date`` is INE's ``<extraction_date>``
+
+        Raises:
+            DataProcessingError: If INE's ``<extraction_date>`` is missing or malformed, or
+                ``varcd`` is not in the catalogue
 
         Example:
             >>> client = CatalogueClient()
-            >>> response = client.get_catalogue_response()
-            >>> print(f"Total: {response.total_count} indicators")
+            >>> response = client.get_catalogue_response("0008273")
+            >>> response.extraction_date
         """
-        indicators = [self.get_indicator(varcd)] if varcd else self.get_main_indicators()
-
+        opc = "2" if complete else "3"
+        params = {"opc": "1", "varcd": varcd} if varcd else {"opc": opc}
+        xml = cast(
+            str,
+            self._make_request(
+                self.CATALOGUE_ENDPOINT,
+                params=params,
+                response_format="xml",
+                progress_callback=progress_callback,
+            ),
+        )
+        indicators = self._parse_catalogue_xml(xml)
+        if varcd and not indicators:
+            raise DataProcessingError(f"Indicator {varcd} not found in catalogue")
+        try:
+            date_text = ET.fromstring(xml).findtext("extraction_date")
+        except ET.ParseError as e:  # already parsed above; kept for the type checker
+            raise DataProcessingError(f"Invalid XML response: {e}") from e
+        if date_text is None:
+            raise DataProcessingError(
+                "INE's catalogue response has no <extraction_date>, which provenance needs"
+            )
         return CatalogueResponse(
-            indicators=indicators, language=self.language, total_count=len(indicators)
+            indicators=indicators,
+            language=self.language,
+            total_count=len(indicators),
+            extraction_date=parse_catalogue_date(date_text),
+            url=request_url(
+                self.BASE_URL, self.CATALOGUE_ENDPOINT, {**params, "lang": self.language}
+            ),
         )
 
     def _parse_catalogue_xml(self, xml_string: str) -> list[Indicator]:

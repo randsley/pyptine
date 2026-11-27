@@ -12,7 +12,6 @@ from pyptine.client.metadata import MetadataClient
 from pyptine.client.parsing import DimensionFilters
 from pyptine.models.indicator import Dimension, Indicator, IndicatorMetadata
 from pyptine.models.response import DataResponse
-from pyptine.processors.csv import export_to_csv
 from pyptine.processors.json import export_to_json
 from pyptine.search.catalog import CatalogueBrowser
 
@@ -31,7 +30,9 @@ class INE:
         language: Language for API responses ('PT' or 'EN')
         cache: Enable HTTP caching
         cache_dir: Custom cache directory (default: platform-specific)
-        cache_ttl: Cache time-to-live in seconds (default: 86400 / 1 day)
+        cache_ttl: How long data responses stay cached, in seconds (default: 86400, 1 day).
+            Metadata and the catalogue stay 7 days. The data's own date is INE's
+            ``DataExtracao`` (``DataResponse.extraction_date``), cached or not
         timeout: Read timeout in seconds (default: 130, longer than INE's 120 s gateway limit).
             HTTP 404 (INE's throttling), 429 and 5xx, failed connections and malformed bodies
             are retried after 5, 20 and 60 s; a read timeout is not
@@ -49,7 +50,7 @@ class INE:
         >>> print(response.to_dataframe().head())
         >>>
         >>> # Export to CSV
-        >>> ine.export_csv("0004127", "output.csv")
+        >>> ine.export_csv("0008273", "output.csv", dimensions={"Dim2": "PT"})
     """
 
     def __init__(
@@ -66,7 +67,7 @@ class INE:
             language: Language code ('PT' or 'EN')
             cache: Enable HTTP caching
             cache_dir: Custom cache directory
-            cache_ttl: Cache TTL in seconds
+            cache_ttl: Data cache TTL in seconds
             timeout: Request timeout in seconds
         """
         self.language = language.upper()
@@ -106,6 +107,7 @@ class INE:
             cache_enabled=cache,
             cache_dir=cache_dir,
             metadata_client=self.metadata_client,  # Pass metadata_client
+            cache_ttl=cache_ttl,
         )
 
         # Initialize catalogue browser
@@ -337,7 +339,8 @@ class INE:
             varcd: Indicator code
             filepath: Output file path
             dimensions: Optional dimension filters
-            include_metadata: Include metadata as header comments
+            include_metadata: Write the provenance header (source, licence, citation,
+                indicator, periods, filters, URL, INE's extraction date)
 
         Example:
             >>> ine = INE()
@@ -345,30 +348,36 @@ class INE:
             >>> ine.export_csv("0004167", "filtered.csv", dimensions={"Dim1": "S7A2020"})
         """
         logger.info(f"Exporting indicator {varcd} to {filepath}")
-
-        # Get data as DataFrame
-        response = self.get_data(varcd, dimensions=dimensions)
-        df = response.to_dataframe()
-
-        # Get metadata if requested
-        metadata_dict = None
-        if include_metadata:
-            metadata = self.get_metadata(varcd)
-            metadata_dict = {
-                "indicator": metadata.varcd,
-                "title": metadata.title,
-                "unit": metadata.unit,
-                "source": metadata.source or "INE Portugal",
-            }
-
-        # Export to CSV
-        export_to_csv(
-            df=df,
-            filepath=Path(filepath),
-            include_metadata=include_metadata,
-            metadata=metadata_dict,
+        # The header is the response's provenance (DataResponse.provenance).
+        self.get_data(varcd, dimensions=dimensions).to_csv(
+            filepath, include_metadata=include_metadata
         )
+        logger.info(f"Successfully exported to {filepath}")
 
+    def export_excel(
+        self,
+        varcd: str,
+        filepath: Union[str, Path],
+        dimensions: Optional[DimensionFilters] = None,
+        include_metadata: bool = True,
+    ) -> None:
+        """Export indicator data to an Excel file with a Provenance sheet (needs openpyxl).
+
+        Args:
+            varcd: Indicator code
+            filepath: Output file path (.xlsx)
+            dimensions: Optional dimension filters
+            include_metadata: Write the Provenance sheet (source, licence, citation,
+                indicator, periods, filters, URL, INE's extraction date)
+
+        Example:
+            >>> ine = INE()
+            >>> ine.export_excel("0008273", "data.xlsx", dimensions={"Dim2": "PT"})
+        """
+        logger.info(f"Exporting indicator {varcd} to {filepath}")
+        self.get_data(varcd, dimensions=dimensions).to_excel(
+            filepath, include_metadata=include_metadata
+        )
         logger.info(f"Successfully exported to {filepath}")
 
     def export_json(
@@ -388,8 +397,8 @@ class INE:
 
         Example:
             >>> ine = INE()
-            >>> ine.export_json("0004127", "data.json")
-            >>> ine.export_json("0004127", "compact.json", pretty=False)
+            >>> ine.export_json("0008273", "data.json")
+            >>> ine.export_json("0008273", "compact.json", pretty=False)
         """
         logger.info(f"Exporting indicator {varcd} to {filepath}")
 

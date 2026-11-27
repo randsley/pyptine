@@ -5,7 +5,6 @@ import responses
 
 from pyptine.client.catalogue import CatalogueClient
 from pyptine.models.indicator import Indicator
-from pyptine.models.response import CatalogueResponse
 from pyptine.utils.exceptions import APIError, DataProcessingError
 
 
@@ -87,57 +86,13 @@ class TestCatalogueClient:
         request_url = responses.calls[0].request.url
         assert "opc=3" in request_url  # Main indicators group
 
-    @responses.activate
-    def test_get_catalogue_response_single(self, catalogue_client, sample_catalogue):
-        """Test get_catalogue_response for single indicator."""
-        responses.add(
-            responses.GET,
-            "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
-            status=200,
-        )
-
-        response = catalogue_client.get_catalogue_response(varcd="0004167")
-
-        assert isinstance(response, CatalogueResponse)
-        assert response.total_count == 1
-        assert len(response) == 1
-        assert response.language == "EN"
-
-    @responses.activate
-    def test_get_catalogue_response_all(self, catalogue_client, sample_catalogue):
-        """Test get_catalogue_response for all indicators."""
-        responses.add(
-            responses.GET,
-            "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
-            status=200,
-        )
-
-        response = catalogue_client.get_catalogue_response()
-
-        assert isinstance(response, CatalogueResponse)
-        assert response.total_count == 2
-        assert len(response) == 2
-
-    @responses.activate
-    def test_catalogue_response_iteration(self, catalogue_client, sample_catalogue):
-        """Test iterating over CatalogueResponse."""
-        responses.add(
-            responses.GET,
-            "https://www.ine.pt/ine/xml_indic.jsp",
-            body=sample_catalogue,
-            status=200,
-        )
-
-        response = catalogue_client.get_catalogue_response()
-
-        # Test iteration
-        for indicator in response:
-            assert isinstance(indicator, Indicator)
-
-        # Test indexing
-        assert isinstance(response[0], Indicator)
+    def test_get_catalogue_response_refuses_missing_date(self, catalogue_client, sample_catalogue):
+        """The hand-written catalogue has no <extraction_date>; INE always sends one."""
+        with responses.RequestsMock() as rsps:
+            rsps.add(responses.GET, "https://www.ine.pt/ine/xml_indic.jsp", body=sample_catalogue)
+            with pytest.raises(DataProcessingError, match="no <extraction_date>"):
+                catalogue_client.get_catalogue_response()
+            assert "opc=3" in rsps.calls[0].request.url
 
     @responses.activate
     def test_parse_indicator_fields(self, catalogue_client, sample_catalogue):

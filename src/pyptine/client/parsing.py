@@ -19,6 +19,7 @@ from typing import Any, Callable, Optional, Union
 
 from pyptine.models.indicator import Dimension, IndicatorMetadata
 from pyptine.models.response import DataResponse
+from pyptine.provenance import parse_extraction_date
 from pyptine.utils.exceptions import DataProcessingError, DimensionError, INERefusalError
 
 logger = logging.getLogger(__name__)
@@ -201,28 +202,37 @@ def parse_data_response(
     response: Union[dict[str, Any], list[Any]],
     language: str,
     get_metadata: Callable[[], Optional[IndicatorMetadata]],
+    url: Optional[str] = None,
+    dimensions: Optional[Mapping[str, str]] = None,
 ) -> DataResponse:
     """Parse a data response into a DataResponse.
 
     Each row of INE's ``Dados`` gets ``period`` (INE's label, in the request language) and
     ``period_code`` (the Dim1 code, e.g. "S7A2022"), taken from the indicator's metadata.
+    Provenance comes from INE's response (``DataExtracao``, ``DataUltimoAtualizacao``,
+    ``MetaInfUrl``) and from the request (``url``, ``dimensions``).
 
     Args:
         varcd: Indicator code requested
         response: Raw JSON body
         language: Request language
         get_metadata: Returns the indicator's metadata in the same language (called lazily)
+        url: The request's URL, recorded for provenance
+        dimensions: The dimension filters sent (normalised), recorded for provenance
 
     Raises:
         INERefusalError: If INE refused the request
-        DataProcessingError: If the response has an unknown shape, or a period label that the
-            metadata does not list
+        DataProcessingError: If the response has an unknown shape, a period label that the
+            metadata does not list, or no ``DataExtracao``
     """
     check_success(response, varcd)
     varcd_val, title, unit = varcd, "", None
     lang = language
     rows: list[dict[str, Any]] = []
     metadata: Optional[IndicatorMetadata] = None
+    extracted = None
+    last_updated: Optional[str] = None
+    metadata_url: Optional[str] = None
 
     def meta() -> Optional[IndicatorMetadata]:
         nonlocal metadata
@@ -256,6 +266,10 @@ def parse_data_response(
             if dados is None:
                 dados = response.get("dados")
             if isinstance(dados, dict):
+                # INE's format: provenance is required, so a missing timestamp is refused.
+                extracted = parse_extraction_date(response.get("DataExtracao"), varcd)
+                last_updated = response.get("DataUltimoAtualizacao")
+                metadata_url = response.get("MetaInfUrl")
                 md = meta()
                 if md is None:
                     raise DataProcessingError(
@@ -295,4 +309,15 @@ def parse_data_response(
             unit = unit if unit is not None else md.unit
             title = title or md.title
 
-    return DataResponse(varcd=varcd_val, title=title, language=lang, data=rows, unit=unit)
+    return DataResponse(
+        varcd=varcd_val,
+        title=title,
+        language=lang,
+        data=rows,
+        unit=unit,
+        extraction_date=extracted,
+        last_updated=last_updated,
+        metadata_url=metadata_url,
+        url=url,
+        dimensions=dict(dimensions or {}),
+    )

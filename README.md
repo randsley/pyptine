@@ -265,13 +265,40 @@ ine.export_csv("0008273", "output.csv")
 # Export to JSON with pretty printing
 ine.export_json("0008273", "output.json", pretty=True)
 
+# Export to Excel (pip install pyptine[excel]): a Data sheet and a Provenance sheet
+ine.export_excel("0008273", "output.xlsx", dimensions={"Dim2": "PT"})
+
 # Export filtered data
 ine.export_csv(
-    "0004167",
+    "0008273",
     "filtered_output.csv",
-    dimensions={"Dim1": "S7A2023"}
+    dimensions={"Dim1": "S7A2023", "Dim2": "PT"}
 )
 ```
+
+**Provenance.** Every `DataResponse` records where its data came from, and the CSV header
+(`include_metadata=True`, the default), the Excel file's `Provenance` sheet and the JSON
+file write it out: source, INE's licence
+terms, the citation INE requires, indicator, title, unit, language, periods (labels and
+codes), the dimension filters sent, the request URL, INE's metadata page, INE's extraction
+timestamp (`DataExtracao`; a response served from the cache keeps INE's date) and the date of
+INE's last update. Reuse of INE data, commercial use included, is permitted under EU
+Directive 2019/1024 on condition that the source is cited:
+
+```python
+from pyptine.provenance import ine_citation
+
+r = ine.get_data("0008273", {"Dim1": ["S7A2021", "S7A2022"], "Dim2": "PT", "Dim3": "T", "Dim4": "T"})
+r.citation
+# 'Source: Statistics Portugal (INE), indicator 0008273, reference periods 2021, 2022, extracted 2026-11-27.'
+ine_citation(r, other_response)  # one sentence for several extracts
+```
+
+`pyptine.processors.export_multiple_sheets({"name": response, ...}, path)` writes several
+responses to one workbook, with one Provenance column per sheet; a plain DataFrame carries no
+provenance, so pass `metadata={...}` to describe it. The catalogue's
+`CatalogueResponse.extraction_date` is INE's `<extraction_date>`; INE states no timezone for it,
+so it is left naive.
 
 #### Every Period of an Indicator
 
@@ -385,7 +412,7 @@ All methods support custom `value_column` and `period_column` parameters to work
 
 The main class for interacting with the INE API.
 
-`INE(language: str = "EN", cache: bool = True, cache_dir: Optional[Path] = None, cache_ttl: int = 86400)`
+`INE(language: str = "EN", cache: bool = True, cache_dir: Optional[Path] = None, cache_ttl: Optional[int] = None, timeout: int = 130)`. `cache_ttl` is how long data responses stay cached (default 1 day); metadata and the catalogue stay 7 days.
 
 | Method | Description |
 | --- | --- |

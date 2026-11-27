@@ -3,11 +3,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from pyptine.models.indicator import Indicator
 from pyptine.processors.csv import export_to_csv
 from pyptine.processors.json import export_to_json
+from pyptine.provenance import INE_ATTRIBUTION, INE_LICENCE, INE_SOURCE, ine_citation
 
 try:
     import pandas as pd
@@ -39,10 +40,12 @@ class DataPoint(BaseModel):
 
 
 class DataResponse(BaseModel):
-    """Wrapper for data API response.
+    """Indicator data with its provenance.
 
-    Contains the indicator data along with metadata about the indicator
-    and when the data was retrieved.
+    ``extraction_date`` is INE's own extraction timestamp (``DataExtracao``), so a response
+    served from the cache keeps the date INE produced it. ``url`` and ``dimensions`` record
+    the request; ``citation`` is the sentence INE's reuse terms require. All of it is written
+    by :meth:`to_csv` (header) and :meth:`to_json`.
     """
 
     varcd: str = Field(..., description="Indicator code")
@@ -50,9 +53,72 @@ class DataResponse(BaseModel):
     language: str = Field(..., description="Language (PT or EN)")
     data: list[dict[str, Any]] = Field(default_factory=list, description="Raw data points")
     unit: Optional[str] = Field(None, description="Unit of measurement")
-    extraction_date: datetime = Field(
-        default_factory=datetime.now, description="When data was extracted"
+    extraction_date: Optional[datetime] = Field(
+        None, description="INE's extraction timestamp (DataExtracao, UTC)"
     )
+    last_updated: Optional[str] = Field(
+        None, description="INE's date of the indicator's last update (DataUltimoAtualizacao)"
+    )
+    metadata_url: Optional[str] = Field(None, description="INE's metadata page (MetaInfUrl)")
+    url: Optional[str] = Field(None, description="The data request's URL")
+    dimensions: dict[str, str] = Field(
+        default_factory=dict, description="Dimension filters sent (cat_id codes, comma-joined)"
+    )
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def period_codes(self) -> list[str]:
+        """INE period codes in the data, in chronological order."""
+        return sorted({str(r["period_code"]) for r in self.data if "period_code" in r})
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def periods(self) -> list[str]:
+        """INE period labels in the data, in chronological order (of their codes)."""
+        labels: dict[str, str] = {}
+        for r in self.data:
+            if "period_code" in r:
+                labels.setdefault(str(r["period_code"]), str(r.get("period", "")))
+        return [labels[c] or c for c in sorted(labels)]
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def source(self) -> str:
+        return INE_SOURCE
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def licence(self) -> str:
+        return INE_LICENCE
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def citation(self) -> str:
+        """INE's required citation, with codes, periods and extraction date (if known)."""
+        if self.extraction_date is None:
+            return INE_ATTRIBUTION
+        return ine_citation(self)
+
+    def provenance(self) -> dict[str, Any]:
+        """Where the data came from, as written in the CSV header."""
+        return {
+            "source": self.source,
+            "licence": self.licence,
+            "citation": self.citation,
+            "indicator": self.varcd,
+            "title": self.title,
+            "unit": self.unit,
+            "language": self.language,
+            "periods": ", ".join(self.periods) or None,
+            "period_codes": ", ".join(self.period_codes) or None,
+            "dimensions": "; ".join(f"{k}={v}" for k, v in self.dimensions.items()) or None,
+            "url": self.url,
+            "metadata_url": self.metadata_url,
+            "ine_extraction_date": (
+                self.extraction_date.isoformat() if self.extraction_date else None
+            ),
+            "ine_last_updated": self.last_updated,
+        }
 
     def _chronological(self) -> list[dict[str, Any]]:
         """Rows ordered by period_code (chronological within an indicator), if present."""
@@ -98,16 +164,31 @@ class DataResponse(BaseModel):
             include_metadata: Include metadata as comment header
             **kwargs: Additional arguments passed to df.to_csv()
         """
-        df = self.to_dataframe()
-        metadata = {
-            "indicator": self.varcd,
-            "title": self.title,
-            "unit": self.unit,
-            "language": self.language,
-            "extraction_date": self.extraction_date.isoformat(),
-        }
         export_to_csv(
-            df, Path(filepath), include_metadata=include_metadata, metadata=metadata, **kwargs
+            self.to_dataframe(),
+            Path(filepath),
+            include_metadata=include_metadata,
+            metadata=self.provenance(),
+            **kwargs,
+        )
+
+    def to_excel(
+        self,
+        filepath: Union[str, Path],
+        include_metadata: bool = True,
+        sheet_name: str = "Data",
+    ) -> None:
+        """Export data to an Excel file, with a ``Provenance`` sheet (needs openpyxl).
+
+        Args:
+            filepath: Output file path (.xlsx)
+            include_metadata: Write the Provenance sheet (as the CSV header)
+            sheet_name: Name of the data sheet
+        """
+        from pyptine.processors.excel import export_multiple_sheets
+
+        export_multiple_sheets(
+            {sheet_name: self}, Path(filepath), include_metadata=include_metadata
         )
 
     def to_json(
@@ -163,14 +244,7 @@ class DataResponse(BaseModel):
         from pyptine.analysis.metrics import calculate_yoy_growth
 
         new_data = calculate_yoy_growth(self.data, value_column, period_column)
-        return DataResponse(
-            varcd=self.varcd,
-            title=self.title,
-            language=self.language,
-            data=new_data,
-            unit=self.unit,
-            extraction_date=self.extraction_date,
-        )
+        return self.model_copy(update={"data": new_data})
 
     def calculate_mom_change(
         self,
@@ -201,14 +275,7 @@ class DataResponse(BaseModel):
         from pyptine.analysis.metrics import calculate_mom_change
 
         new_data = calculate_mom_change(self.data, value_column, period_column)
-        return DataResponse(
-            varcd=self.varcd,
-            title=self.title,
-            language=self.language,
-            data=new_data,
-            unit=self.unit,
-            extraction_date=self.extraction_date,
-        )
+        return self.model_copy(update={"data": new_data})
 
     def calculate_moving_average(
         self,
@@ -242,14 +309,7 @@ class DataResponse(BaseModel):
         from pyptine.analysis.metrics import calculate_moving_average
 
         new_data = calculate_moving_average(self.data, window, value_column, period_column)
-        return DataResponse(
-            varcd=self.varcd,
-            title=self.title,
-            language=self.language,
-            data=new_data,
-            unit=self.unit,
-            extraction_date=self.extraction_date,
-        )
+        return self.model_copy(update={"data": new_data})
 
     def calculate_exponential_moving_average(
         self,
@@ -285,14 +345,7 @@ class DataResponse(BaseModel):
         new_data = calculate_exponential_moving_average(
             self.data, span, value_column, period_column
         )
-        return DataResponse(
-            varcd=self.varcd,
-            title=self.title,
-            language=self.language,
-            data=new_data,
-            unit=self.unit,
-            extraction_date=self.extraction_date,
-        )
+        return self.model_copy(update={"data": new_data})
 
     def plot(
         self,
@@ -512,17 +565,29 @@ class DataResponse(BaseModel):
 
 
 class CatalogueResponse(BaseModel):
-    """Wrapper for catalogue API response.
+    """Indicators from INE's catalogue, with provenance.
 
-    Contains a list of indicators returned from the catalogue query.
+    ``extraction_date`` is INE's own ``<extraction_date>``, naive: INE states no timezone
+    (see :func:`pyptine.provenance.parse_catalogue_date`).
     """
 
     indicators: list["Indicator"] = Field(default_factory=list, description="List of indicators")
     language: str = Field(..., description="Language (PT or EN)")
     extraction_date: datetime = Field(
-        default_factory=datetime.now, description="When data was extracted"
+        ..., description="INE's catalogue <extraction_date> (INE's clock, timezone not stated)"
     )
+    url: Optional[str] = Field(None, description="The catalogue request's URL")
     total_count: int = Field(0, description="Total number of indicators")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def source(self) -> str:
+        return INE_SOURCE
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def licence(self) -> str:
+        return INE_LICENCE
 
     def __len__(self) -> int:
         """Return number of indicators."""
