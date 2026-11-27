@@ -36,4 +36,3 @@ ignores `start`/`count`). Ordered by effect on users.
     - `pivot_by_dimension`/`aggregate_by_period` default `value_column="valor"`, but rows hold `value`; list handling of `value_column`.
     - `merge_json_files`' `merge_key` is unused.
     - `type: ignore` at `search/catalog.py` (`get_recently_updated`); redundant `cast` calls in `client/base.py`.
-    - `COMPATIBILITY_SUMMARY.md`, `GITHUB_CHECKLIST.md`, `PROJECT_SUMMARY.md`, `PYTHON_3.14_COMPATIBILITY.md` may be stale.
